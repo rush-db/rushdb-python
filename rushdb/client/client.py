@@ -1,68 +1,11 @@
-"""RushDB Client
-
-A modern graph database client implementation.
-"""
+"""RushDB Client"""
 
 import json
 import urllib.request
 import urllib.parse
 import urllib.error
-from typing import Any, Dict, List, Optional, Union, TypeVar, TypedDict, Literal, Protocol, cast
+from typing import Any, Dict, List, Optional, Union, TypedDict, Literal
 from datetime import datetime
-
-# Basic type aliases
-Schema = TypeVar('Schema', bound=Dict[str, Any])
-FlatObject = Dict[str, Any]
-MaybeArray = Union[List[Any], Any]
-
-# Record types
-class DBRecordInternalProps(TypedDict):
-    """Internal properties of a database record."""
-    __id: str
-    __label: str
-    __proptypes: Optional[Dict[str, str]]
-
-class DBRecord(TypedDict, total=False):
-    """Database record with internal and user-defined properties."""
-    __id: str
-    __label: str
-    __proptypes: Optional[Dict[str, str]]
-
-class DBRecordDraft:
-    """Draft for creating a new record."""
-    def __init__(self, label: str, payload: Union[Dict[str, Any], List[Dict[str, Any]]], options: Optional[Dict[str, bool]] = None):
-        self.label = label
-        self.payload = payload
-        self.options = options or {
-            "returnResult": True,
-            "suggestTypes": True
-        }
-
-    def to_json(self) -> Dict[str, Any]:
-        """Convert draft to JSON format."""
-        return {
-            "label": self.label,
-            "options": self.options,
-            "payload": self.payload
-        }
-
-class DBRecordsBatchDraft:
-    """Draft for creating multiple records in batch."""
-    def __init__(self, label: str, payload: Union[Dict[str, Any], List[Dict[str, Any]]], options: Optional[Dict[str, bool]] = None):
-        self.label = label
-        self.payload = payload
-        self.options = options or {
-            "returnResult": True,
-            "suggestTypes": True
-        }
-
-    def to_json(self) -> Dict[str, Any]:
-        """Convert batch draft to JSON format."""
-        return {
-            "label": self.label,
-            "options": self.options,
-            "payload": self.payload
-        }
 
 # Relation types
 RelationDirection = Literal['in', 'out']
@@ -265,16 +208,24 @@ class RecordsAPI:
             :param
         """
         headers = self._build_transaction_header(transaction.id if transaction else None)
-        draft = DBRecordDraft(label, data, options)
-        response = self.client._make_request('POST', '/api/v1/records', draft.to_json(), headers)
+
+        payload = {
+            "label": label,
+            "payload": data,
+            "options": options or {
+                "returnResult": True,
+                "suggestTypes": True
+            }
+        }
+        response = self.client._make_request('POST', '/api/v1/records', payload, headers)
         return Record(self.client, response)
 
-    def create_many(self, label: str, data: List[Dict[str, Any]], options: Optional[Dict[str, bool]] = None, transaction: Optional[Transaction] = None) -> List[Record]:
+    def create_many(self, label: str, data: Union[Dict[str, Any], List[Dict[str, Any]]], options: Optional[Dict[str, bool]] = None, transaction: Optional[Transaction] = None) -> List[Record]:
         """Create multiple records.
 
         Args:
             label: Label for all records
-            data: List of record data
+            data: List or Dict of record data
             options: Optional parsing and response options (returnResult, suggestTypes)
             transaction: Optional transaction object
 
@@ -282,8 +233,16 @@ class RecordsAPI:
             List of Record objects
         """
         headers = self._build_transaction_header(transaction.id if transaction else None)
-        draft = DBRecordsBatchDraft(label, data, options)
-        response = self.client._make_request('POST', '/api/v1/records/import/json', draft.to_json(), headers)
+
+        payload = {
+            "label": label,
+            "payload": data,
+            "options": options or {
+                "returnResult": True,
+                "suggestTypes": True
+            }
+        }
+        response = self.client._make_request('POST', '/api/v1/records/import/json', payload, headers)
 
         print('r:', response)
 
@@ -358,8 +317,6 @@ class RecordsAPI:
     def import_csv(self, label: str, csv_data: Union[str, bytes], options: Optional[Dict[str, bool]] = None, transaction: Optional[Transaction] = None) -> List[Dict[str, Any]]:
         """Import data from CSV."""
         headers = self._build_transaction_header(transaction.id if transaction else None)
-        # if isinstance(csv_data, str):
-        #     csv_data = csv_data.encode('utf-8')
 
         payload = {
             "label": label,
@@ -370,12 +327,7 @@ class RecordsAPI:
             }
         }
 
-        return self.client._make_request(
-            'POST',
-            '/api/v1/records/import/csv',
-            payload,
-            headers,
-        )
+        return self.client._make_request('POST','/api/v1/records/import/csv', payload, headers)
 
     @staticmethod
     def _build_transaction_header(transaction_id: Optional[str] = None) -> Optional[Dict[str, str]]:
@@ -391,6 +343,8 @@ class RecordsAPI:
             return [t['__id'] if isinstance(t, dict) and '__id' in t else t for t in target]
         elif isinstance(target, Record) and '__id' in target.data:
             return [target.data['__id']]
+        elif isinstance(target, dict) and '__id' in target:
+            return [target['__id']]
         raise ValueError("Invalid target format")
 
 class PropertyAPI:
