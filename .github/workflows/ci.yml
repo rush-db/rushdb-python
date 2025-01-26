@@ -1,0 +1,51 @@
+name: Python SDK CI
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: 1.7.1
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Install dependencies
+      run: |
+        cd python-sdk
+        poetry install
+    
+    - name: Run linters
+      run: |
+        cd python-sdk
+        poetry run black . --check
+        poetry run isort . --check
+        poetry run ruff check .
+        poetry run mypy rushdb tests
+    
+    - name: Run tests
+      run: |
+        cd python-sdk
+        poetry run pytest tests/ --cov=rushdb --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./python-sdk/coverage.xml
+        flags: python-sdk 
