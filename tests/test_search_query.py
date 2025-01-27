@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from dotenv import load_dotenv
-from rushdb.client import (
+from src.rushdb import (
     RushDBClient,
 
     RushDBError

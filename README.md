@@ -11,7 +11,7 @@ pip install rushdb
 ## Quick Start
 
 ```python
-from rushdb import RushDBClient
+from src.rushdb import RushDBClient
 
 # Initialize the client
 client = RushDBClient("http://localhost:8000", "your-api-key")
