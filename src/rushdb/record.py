@@ -19,6 +19,16 @@ class Record:
         return self.data['__id']
 
     @property
+    def proptypes(self) -> str:
+        """Get record ID."""
+        return self.data['__proptypes']
+
+    @property
+    def label(self) -> str:
+        """Get record ID."""
+        return self.data['__label']
+
+    @property
     def timestamp(self) -> int:
         """Get record timestamp from ID."""
         parts = self.data.get('__id').split('-')
