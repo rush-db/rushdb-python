@@ -1,5 +1,8 @@
-from src.rushdb import RushDBClient, RushDBError
+from typing import Optional, Dict, TYPE_CHECKING
 
+from ..common import RushDBError
+if TYPE_CHECKING:
+    from ..client import RushDBClient
 
 class Transaction:
     """Represents a RushDB transaction."""

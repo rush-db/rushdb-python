@@ -1,14 +1,11 @@
 from typing import Optional
 
-from src.rushdb import RushDBClient
-from src.rushdb.transaction import Transaction
+from .base import BaseAPI
+from ..models.transaction import Transaction
 
 
-class TransactionsAPI:
+class TransactionsAPI(BaseAPI):
     """API for managing transactions in RushDB."""
-    def __init__(self, client: 'RushDBClient'):
-        self.client = client
-
     def begin(self, ttl: Optional[int] = None) -> Transaction:
         """Begin a new transaction.
 

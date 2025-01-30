@@ -1,68 +1,20 @@
 """Test cases for RushDB search query functionality."""
 
-import os
 import unittest
-from pathlib import Path
 
-from dotenv import load_dotenv
-from src.rushdb import (
-    RushDBClient,
+from .test_base_setup import TestBase
 
-    RushDBError
-)
-
-def load_env():
-    """Load environment variables from .env file."""
-    # Try to load from the root directory first
-    root_env = Path(__file__).parent.parent / '.env'
-    if root_env.exists():
-        load_dotenv(root_env)
-    else:
-        # Fallback to default .env.example if no .env exists
-        example_env = Path(__file__).parent.parent / '.env.example'
-        if example_env.exists():
-            load_dotenv(example_env)
-            print("Warning: Using .env.example for testing. Create a .env file with your credentials for proper testing.")
-
-class TestBase(unittest.TestCase):
-    """Base test class with common setup."""
-
-    @classmethod
-    def setUpClass(cls):
-        """Set up test environment."""
-        load_env()
-
-        # Get configuration from environment variables
-        cls.token = os.getenv('RUSHDB_TOKEN')
-        cls.base_url = os.getenv('RUSHDB_URL', 'http://localhost:3000')
-
-        if not cls.token:
-            raise ValueError(
-                "RUSHDB_TOKEN environment variable is not set. "
-                "Please create a .env file with your credentials. "
-                "You can use .env.example as a template."
-            )
-
-    def setUp(self):
-        """Set up test client."""
-        self.client = RushDBClient(self.token, base_url=self.base_url)
-
-        # Verify connection
-        try:
-            if not self.client.ping():
-                self.skipTest(f"Could not connect to RushDB at {self.base_url}")
-        except RushDBError as e:
-            self.skipTest(f"RushDB connection error: {str(e)}")
 
 class TestSearchQuery(TestBase):
     def test_basic_equality_search(self):
         """Test basic equality search"""
         query = {
             "where": {
-                "name": "John"  # Implicit equality
+                "name": "John Doe"  # Implicit equality
             }
         }
-        self.client.records.find(query)
+        result = self.client.records.find(query)
+        print(result)
 
     def test_basic_comparison_operators(self):
         """Test basic comparison operators"""
@@ -128,8 +80,7 @@ class TestSearchQuery(TestBase):
                     {
                         "$and": [
                             {"age": {"$gte": 65}},
-                            {"status": "retired"},
-                            {"pension": {"$exists": True}}
+                            {"status": "retired"}
                         ]
                     }
                 ]

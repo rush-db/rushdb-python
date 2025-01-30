@@ -1,17 +1,5 @@
-from typing import Dict, List, Optional, Union, TypedDict, Literal
+from typing import Dict, Optional
 
-# Relation types
-RelationDirection = Literal['in', 'out']
-
-class RelationOptions(TypedDict, total=False):
-    """Options for creating relations."""
-    direction: Optional[RelationDirection]
-    type: Optional[str]
-
-class RelationDetachOptions(TypedDict, total=False):
-    """Options for detaching relations."""
-    direction: Optional[RelationDirection]
-    typeOrTypes: Optional[Union[str, List[str]]]
 
 class RushDBError(Exception):
     """Custom exception for RushDB client errors."""

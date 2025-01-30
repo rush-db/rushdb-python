@@ -1,22 +1,28 @@
 from datetime import datetime
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional, Union, List, TYPE_CHECKING
 
-from src.rushdb import RushDBClient
-from src.rushdb.common import RelationOptions, RelationDetachOptions
-from src.rushdb.transaction import Transaction
-
+from .relationship import RelationshipOptions, RelationshipDetachOptions
+from .transaction import Transaction
+if TYPE_CHECKING:
+    from ..client import RushDBClient
 
 class Record:
     """Represents a record in RushDB with methods for manipulation."""
     def __init__(self, client: 'RushDBClient', data: Dict[str, Any] = None):
         self._client = client
-
-        self.data = data.get('data')
+        # Handle different data formats
+        if isinstance(data, dict):
+            self.data = data
+        elif isinstance(data, str):
+            # If just a string is passed, assume it's an ID
+            self.data = {}
+        else:
+            raise ValueError(f"Invalid data format for Record: {type(data)}")
 
     @property
     def id(self) -> str:
         """Get record ID."""
-        return self.data['__id']
+        return self.data.get('__id')
 
     @property
     def proptypes(self) -> str:
@@ -48,12 +54,12 @@ class Record:
         """Update record data through API request."""
         return self._client.records.update(self.id, data, transaction)
 
-    def attach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationOptions] = None, transaction: Optional[
+    def attach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationshipOptions] = None, transaction: Optional[
         Transaction] = None) -> Dict[str, str]:
         """Attach other records to this record."""
         return self._client.records.attach(self.id, target, options, transaction)
 
-    def detach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationDetachOptions] = None, transaction: Optional[
+    def detach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationshipDetachOptions] = None, transaction: Optional[
         Transaction] = None) -> Dict[str, str]:
         """Detach records from this record."""
         return self._client.records.detach(self.id, target, options, transaction)

@@ -6,11 +6,11 @@ import urllib.parse
 import urllib.error
 from typing import Any, Dict, Optional
 
-from src.rushdb.common import RushDBError
-from src.rushdb.labels_api import LabelsAPI
-from src.rushdb.properties_api import PropertiesAPI
-from src.rushdb.records_api import RecordsAPI
-from src.rushdb.transactions_api import TransactionsAPI
+from .common import RushDBError
+from .api.labels import LabelsAPI
+from .api.properties import PropertiesAPI
+from .api.records import RecordsAPI
+from .api.transactions import TransactionsAPI
 
 class RushDBClient:
     """Main client for interacting with RushDB."""
