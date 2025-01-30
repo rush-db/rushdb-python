@@ -1,7 +1,6 @@
 from typing import Dict, Any, Optional, Union, List
 
 from .base import BaseAPI
-from ..common import RushDBError
 from ..models.relationship import RelationshipOptions, RelationshipDetachOptions
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
