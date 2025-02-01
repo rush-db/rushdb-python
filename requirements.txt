@@ -1,6 +1,0 @@
-# Core dependencies
-urllib3>=2.0.0
-
-# Testing dependencies
-python-dotenv>=1.0.0
-pytest>=7.0.0 
