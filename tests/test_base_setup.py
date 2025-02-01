@@ -10,15 +10,17 @@ from src.rushdb import RushDBClient, RushDBError
 def load_env():
     """Load environment variables from .env file."""
     # Try to load from the root directory first
-    root_env = Path(__file__).parent.parent / '.env'
+    root_env = Path(__file__).parent.parent / ".env"
     if root_env.exists():
         load_dotenv(root_env)
     else:
         # Fallback to default .env.example if no .env exists
-        example_env = Path(__file__).parent.parent / '.env.example'
+        example_env = Path(__file__).parent.parent / ".env.example"
         if example_env.exists():
             load_dotenv(example_env)
-            print("Warning: Using .env.example for testing. Create a .env file with your credentials for proper testing.")
+            print(
+                "Warning: Using .env.example for testing. Create a .env file with your credentials for proper testing."
+            )
 
 
 class TestBase(unittest.TestCase):
@@ -30,8 +32,8 @@ class TestBase(unittest.TestCase):
         load_env()
 
         # Get configuration from environment variables
-        cls.token = os.getenv('RUSHDB_TOKEN')
-        cls.base_url = os.getenv('RUSHDB_URL', 'http://localhost:8000')
+        cls.token = os.getenv("RUSHDB_TOKEN")
+        cls.base_url = os.getenv("RUSHDB_URL", "http://localhost:8000")
 
         if not cls.token:
             raise ValueError(

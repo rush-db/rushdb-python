@@ -1,13 +1,15 @@
 from enum import Enum
-from typing import Any, Union, Dict, List, TypedDict, Optional
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 
 class OrderDirection(str, Enum):
-    ASC = 'asc'
-    DESC = 'desc'
+    ASC = "asc"
+    DESC = "desc"
+
 
 class SearchQuery(TypedDict, total=False):
     """TypedDict representing the query structure for finding records."""
+
     where: Optional[Dict[str, Any]]
     labels: Optional[List[str]]
     skip: Optional[int]

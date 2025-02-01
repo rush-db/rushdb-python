@@ -1,12 +1,15 @@
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Optional
 
 from ..common import RushDBError
+
 if TYPE_CHECKING:
     from ..client import RushDBClient
 
+
 class Transaction:
     """Represents a RushDB transaction."""
-    def __init__(self, client: 'RushDBClient', transaction_id: str):
+
+    def __init__(self, client: "RushDBClient", transaction_id: str):
         self.client = client
         self.id = transaction_id
         self._committed = False
@@ -27,11 +30,13 @@ class Transaction:
         self._rolled_back = True
 
     @staticmethod
-    def _build_transaction_header(transaction_id: Optional[str] = None) -> Optional[Dict[str, str]]:
+    def _build_transaction_header(
+        transaction_id: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
         """Build transaction header if transaction_id is provided."""
-        return {'X-Transaction-Id': transaction_id} if transaction_id else None
+        return {"X-Transaction-Id": transaction_id} if transaction_id else None
 
-    def __enter__(self) -> 'Transaction':
+    def __enter__(self) -> "Transaction":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

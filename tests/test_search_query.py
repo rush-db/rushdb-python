@@ -8,11 +8,7 @@ from .test_base_setup import TestBase
 class TestSearchQuery(TestBase):
     def test_basic_equality_search(self):
         """Test basic equality search"""
-        query = {
-            "where": {
-                "name": "John Doe"  # Implicit equality
-            }
-        }
+        query = {"where": {"name": "John Doe"}}  # Implicit equality
         result = self.client.records.find(query)
         print(result)
 
@@ -22,7 +18,7 @@ class TestSearchQuery(TestBase):
             "where": {
                 "age": {"$gt": 25},
                 "score": {"$lte": 100},
-                "status": {"$ne": "inactive"}
+                "status": {"$ne": "inactive"},
             }
         }
         self.client.records.find(query)
@@ -33,7 +29,7 @@ class TestSearchQuery(TestBase):
             "where": {
                 "name": {"$startsWith": "J"},
                 "email": {"$contains": "@example.com"},
-                "code": {"$endsWith": "XYZ"}
+                "code": {"$endsWith": "XYZ"},
             }
         }
         self.client.records.find(query)
@@ -44,7 +40,7 @@ class TestSearchQuery(TestBase):
             "where": {
                 "status": {"$in": ["active", "pending"]},
                 "category": {"$nin": ["archived", "deleted"]},
-                "tags": {"$contains": "important"}
+                "tags": {"$contains": "important"},
             }
         }
         self.client.records.find(query)
@@ -53,14 +49,8 @@ class TestSearchQuery(TestBase):
         """Test logical operators (AND, OR, NOT)"""
         query = {
             "where": {
-                "$and": [
-                    {"age": {"$gte": 18}},
-                    {"status": "active"}
-                ],
-                "$or": [
-                    {"role": "admin"},
-                    {"permissions": {"$contains": "write"}}
-                ]
+                "$and": [{"age": {"$gte": 18}}, {"status": "active"}],
+                "$or": [{"role": "admin"}, {"permissions": {"$contains": "write"}}],
             }
         }
         self.client.records.find(query)
@@ -74,15 +64,10 @@ class TestSearchQuery(TestBase):
                         "$and": [
                             {"age": {"$gte": 18}},
                             {"age": {"$lt": 65}},
-                            {"status": "employed"}
+                            {"status": "employed"},
                         ]
                     },
-                    {
-                        "$and": [
-                            {"age": {"$gte": 65}},
-                            {"status": "retired"}
-                        ]
-                    }
+                    {"$and": [{"age": {"$gte": 65}}, {"status": "retired"}]},
                 ]
             }
         }
@@ -100,28 +85,21 @@ class TestSearchQuery(TestBase):
                                 "name": "Engineering",
                                 "COMPANY": {
                                     "industry": "Technology",
-                                    "revenue": {"$gt": 1000000}
-                                }
+                                    "revenue": {"$gt": 1000000},
+                                },
                             }
-                        }
+                        },
                     ]
                 }
             },
             "orderBy": {"created_at": "desc"},
-            "limit": 10
+            "limit": 10,
         }
         self.client.records.find(query)
 
     def test_query_builder_simple(self):
         """Test simple query conditions"""
-        query = {
-            "where": {
-                "$and": [
-                    {"age": {"$gt": 25}},
-                    {"status": "active"}
-                ]
-            }
-        }
+        query = {"where": {"$and": [{"age": {"$gt": 25}}, {"status": "active"}]}}
         self.client.records.find(query)
 
     def test_query_builder_complex(self):
@@ -133,19 +111,14 @@ class TestSearchQuery(TestBase):
                         "$and": [
                             {"age": {"$gte": 18}},
                             {"age": {"$lt": 65}},
-                            {"status": "employed"}
+                            {"status": "employed"},
                         ]
                     },
-                    {
-                        "$and": [
-                            {"age": {"$gte": 65}},
-                            {"status": "retired"}
-                        ]
-                    }
+                    {"$and": [{"age": {"$gte": 65}}, {"status": "retired"}]},
                 ]
             },
             "orderBy": {"age": "desc"},
-            "limit": 20
+            "limit": 20,
         }
         self.client.records.find(query)
 
@@ -169,15 +142,15 @@ class TestSearchQuery(TestBase):
                                                 {
                                                     "MANUFACTURED_BY": {
                                                         "country": "Japan",
-                                                        "rating": {"$gte": 4}
+                                                        "rating": {"$gte": 4},
                                                     }
-                                                }
+                                                },
                                             ]
                                         }
-                                    }
+                                    },
                                 ]
                             }
-                        }
+                        },
                     ]
                 }
             }
@@ -196,9 +169,9 @@ class TestSearchQuery(TestBase):
                             {
                                 "$and": [
                                     {"guardian": {"$exists": True}},
-                                    {"guardian_approved": True}
+                                    {"guardian_approved": True},
                                 ]
-                            }
+                            },
                         ]
                     },
                     {"status": {"$in": ["active", "pending"]}},
@@ -215,26 +188,26 @@ class TestSearchQuery(TestBase):
                                             {"expires_at": {"$gt": "2024-01-01"}},
                                             {
                                                 "INCLUDES_FEATURES": {
-                                                    "name": {"$in": ["feature1", "feature2"]},
-                                                    "enabled": True
+                                                    "name": {
+                                                        "$in": ["feature1", "feature2"]
+                                                    },
+                                                    "enabled": True,
                                                 }
-                                            }
+                                            },
                                         ]
                                     }
-                                }
+                                },
                             ]
                         }
-                    }
+                    },
                 ]
             },
-            "orderBy": {
-                "created_at": "desc",
-                "name": "asc"
-            },
+            "orderBy": {"created_at": "desc", "name": "asc"},
             "skip": 0,
-            "limit": 50
+            "limit": 50,
         }
         self.client.records.find(query)
 
-if __name__ == '__main__':
-    unittest.main() 
+
+if __name__ == "__main__":
+    unittest.main()

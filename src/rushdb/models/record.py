@@ -1,14 +1,17 @@
 from datetime import datetime
-from typing import Dict, Any, Optional, Union, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from .relationship import RelationshipOptions, RelationshipDetachOptions
+from .relationship import RelationshipDetachOptions, RelationshipOptions
 from .transaction import Transaction
+
 if TYPE_CHECKING:
     from ..client import RushDBClient
 
+
 class Record:
     """Represents a record in RushDB with methods for manipulation."""
-    def __init__(self, client: 'RushDBClient', data: Dict[str, Any] = None):
+
+    def __init__(self, client: "RushDBClient", data: Dict[str, Any] = None):
         self._client = client
         # Handle different data formats
         if isinstance(data, dict):
@@ -22,22 +25,22 @@ class Record:
     @property
     def id(self) -> str:
         """Get record ID."""
-        return self.data.get('__id')
+        return self.data.get("__id")
 
     @property
     def proptypes(self) -> str:
         """Get record ID."""
-        return self.data['__proptypes']
+        return self.data["__proptypes"]
 
     @property
     def label(self) -> str:
         """Get record ID."""
-        return self.data['__label']
+        return self.data["__label"]
 
     @property
     def timestamp(self) -> int:
         """Get record timestamp from ID."""
-        parts = self.data.get('__id').split('-')
+        parts = self.data.get("__id").split("-")
         high_bits_hex = parts[0] + parts[1][:4]
         return int(high_bits_hex, 16)
 
@@ -46,21 +49,47 @@ class Record:
         """Get record creation date from ID."""
         return datetime.fromtimestamp(self.timestamp / 1000)
 
-    def set(self, data: Dict[str, Any], transaction: Optional[Transaction] = None) -> Dict[str, str]:
+    def set(
+        self, data: Dict[str, Any], transaction: Optional[Transaction] = None
+    ) -> Dict[str, str]:
         """Set record data through API request."""
         return self._client.records.set(self.id, data, transaction)
 
-    def update(self, data: Dict[str, Any], transaction: Optional[Transaction] = None) -> Dict[str, str]:
+    def update(
+        self, data: Dict[str, Any], transaction: Optional[Transaction] = None
+    ) -> Dict[str, str]:
         """Update record data through API request."""
         return self._client.records.update(self.id, data, transaction)
 
-    def attach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationshipOptions] = None, transaction: Optional[
-        Transaction] = None) -> Dict[str, str]:
+    def attach(
+        self,
+        target: Union[
+            str,
+            List[str],
+            Dict[str, Any],
+            List[Dict[str, Any]],
+            "Record",
+            List["Record"],
+        ],
+        options: Optional[RelationshipOptions] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> Dict[str, str]:
         """Attach other records to this record."""
         return self._client.records.attach(self.id, target, options, transaction)
 
-    def detach(self, target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], 'Record', List['Record']], options: Optional[RelationshipDetachOptions] = None, transaction: Optional[
-        Transaction] = None) -> Dict[str, str]:
+    def detach(
+        self,
+        target: Union[
+            str,
+            List[str],
+            Dict[str, Any],
+            List[Dict[str, Any]],
+            "Record",
+            List["Record"],
+        ],
+        options: Optional[RelationshipDetachOptions] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> Dict[str, str]:
         """Detach records from this record."""
         return self._client.records.detach(self.id, target, options, transaction)
 
