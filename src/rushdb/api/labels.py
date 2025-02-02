@@ -1,3 +1,4 @@
+import typing
 from typing import List, Optional
 
 from ..models.search_query import SearchQuery
@@ -14,10 +15,11 @@ class LabelsAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> List[str]:
         """List all labels."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
-            "POST", "/api/v1/labels", data=query or {}, headers=headers
+            "POST",
+            "/api/v1/labels",
+            data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+            headers=headers,
         )

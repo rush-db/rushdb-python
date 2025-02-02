@@ -1,3 +1,4 @@
+import typing
 from typing import List, Optional, TypedDict, Union
 from urllib.parse import urlencode
 
@@ -46,13 +47,14 @@ class RelationsAPI(BaseAPI):
         path = f"/records/relations/search{query_string}"
 
         # Build headers with transaction if present
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         # Make request
         response = self.client._make_request(
-            method="POST", path=path, data=query or {}, headers=headers
+            method="POST",
+            path=path,
+            data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+            headers=headers,
         )
 
         return response.data

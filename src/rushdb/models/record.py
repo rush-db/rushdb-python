@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 class Record:
     """Represents a record in RushDB with methods for manipulation."""
 
-    def __init__(self, client: "RushDBClient", data: Dict[str, Any] = None):
+    def __init__(
+        self, client: "RushDBClient", data: Union[Dict[str, Any], None] = None
+    ):
         self._client = client
         # Handle different data formats
         if isinstance(data, dict):
@@ -25,7 +27,11 @@ class Record:
     @property
     def id(self) -> str:
         """Get record ID."""
-        return self.data.get("__id")
+        record_id = self.data.get("__id")
+        if record_id is None:
+            raise ValueError("Record ID is missing or None")
+
+        return record_id
 
     @property
     def proptypes(self) -> str:
@@ -40,7 +46,11 @@ class Record:
     @property
     def timestamp(self) -> int:
         """Get record timestamp from ID."""
-        parts = self.data.get("__id").split("-")
+        record_id = self.data.get("__id")
+        if record_id is None:
+            raise ValueError("Record ID is missing or None")
+
+        parts = record_id.split("-")
         high_bits_hex = parts[0] + parts[1][:4]
         return int(high_bits_hex, 16)
 

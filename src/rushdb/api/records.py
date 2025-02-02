@@ -1,3 +1,4 @@
+import typing
 from typing import Any, Dict, List, Optional, Union
 
 from ..models.record import Record
@@ -17,9 +18,7 @@ class RecordsAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Update a record by ID."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
         return self.client._make_request(
             "PUT", f"/api/v1/records/{record_id}", data, headers
         )
@@ -31,9 +30,8 @@ class RecordsAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Update a record by ID."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
+
         return self.client._make_request(
             "PATCH", f"/api/v1/records/{record_id}", data, headers
         )
@@ -57,9 +55,7 @@ class RecordsAPI(BaseAPI):
             Record object
             :param
         """
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         payload = {
             "label": label,
@@ -89,9 +85,7 @@ class RecordsAPI(BaseAPI):
         Returns:
             List of Record objects
         """
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         payload = {
             "label": label,
@@ -106,19 +100,25 @@ class RecordsAPI(BaseAPI):
     def attach(
         self,
         source: Union[str, Dict[str, Any]],
-        target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]],
+        target: Union[
+            str,
+            List[str],
+            Dict[str, Any],
+            List[Dict[str, Any]],
+            "Record",
+            List["Record"],
+        ],
         options: Optional[RelationshipOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Attach records to a source record."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
+
         source_id = self._extract_target_ids(source)[0]
         target_ids = self._extract_target_ids(target)
         payload = {"targetIds": target_ids}
         if options:
-            payload.update(options)
+            payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
             "POST", f"/api/v1/records/{source_id}/relations", payload, headers
         )
@@ -126,19 +126,25 @@ class RecordsAPI(BaseAPI):
     def detach(
         self,
         source: Union[str, Dict[str, Any]],
-        target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]],
+        target: Union[
+            str,
+            List[str],
+            Dict[str, Any],
+            List[Dict[str, Any]],
+            "Record",
+            List["Record"],
+        ],
         options: Optional[RelationshipDetachOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Detach records from a source record."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
+
         source_id = self._extract_target_ids(source)[0]
         target_ids = self._extract_target_ids(target)
         payload = {"targetIds": target_ids}
         if options:
-            payload.update(options)
+            payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
             "PUT", f"/api/v1/records/{source_id}/relations", payload, headers
         )
@@ -147,11 +153,13 @@ class RecordsAPI(BaseAPI):
         self, query: SearchQuery, transaction: Optional[Transaction] = None
     ) -> Dict[str, str]:
         """Delete records matching the query."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
+
         return self.client._make_request(
-            "PUT", "/api/v1/records/delete", query, headers
+            "PUT",
+            "/api/v1/records/delete",
+            typing.cast(typing.Dict[str, typing.Any], query or {}),
+            headers,
         )
 
     def delete_by_id(
@@ -160,9 +168,8 @@ class RecordsAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Delete records by ID(s)."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
+
         if isinstance(id_or_ids, list):
             return self.client._make_request(
                 "PUT",
@@ -183,16 +190,18 @@ class RecordsAPI(BaseAPI):
         """Find records matching the query."""
 
         try:
-            headers = Transaction._build_transaction_header(
-                transaction.id if transaction else None
-            )
+            headers = Transaction._build_transaction_header(transaction)
+
             path = (
                 f"/api/v1/records/{record_id}/search"
                 if record_id
                 else "/api/v1/records/search"
             )
             response = self.client._make_request(
-                "POST", path, data=query or {}, headers=headers
+                "POST",
+                path,
+                data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+                headers=headers,
             )
             return [Record(self.client, record) for record in response.get("data")]
         except Exception:
@@ -206,9 +215,7 @@ class RecordsAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> List[Dict[str, Any]]:
         """Import data from CSV."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         payload = {
             "label": label,
@@ -222,15 +229,20 @@ class RecordsAPI(BaseAPI):
 
     @staticmethod
     def _extract_target_ids(
-        target: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]
+        target: Union[
+            str,
+            List[str],
+            Dict[str, Any],
+            List[Dict[str, Any]],
+            "Record",
+            List["Record"],
+        ]
     ) -> List[str]:
         """Extract target IDs from various input types."""
         if isinstance(target, str):
             return [target]
         elif isinstance(target, list):
-            return [
-                t["__id"] if isinstance(t, dict) and "__id" in t else t for t in target
-            ]
+            return [t.get("__id", "") if isinstance(t, dict) else "" for t in target]
         elif isinstance(target, Record) and "__id" in target.data:
             return [target.data["__id"]]
         elif isinstance(target, dict) and "__id" in target:

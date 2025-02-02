@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, Union
 
 from ..common import RushDBError
 
@@ -31,9 +31,16 @@ class Transaction:
 
     @staticmethod
     def _build_transaction_header(
-        transaction_id: Optional[str] = None,
+        transaction: Optional[Union[str, "Transaction"]] = None,
     ) -> Optional[Dict[str, str]]:
         """Build transaction header if transaction_id is provided."""
+        transaction_id = None
+
+        if isinstance(transaction, Transaction):
+            transaction_id = transaction.id
+        else:
+            transaction_id = transaction
+
         return {"X-Transaction-Id": transaction_id} if transaction_id else None
 
     def __enter__(self) -> "Transaction":

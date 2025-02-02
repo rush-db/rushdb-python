@@ -18,24 +18,11 @@ class DatetimeObject(TypedDict, total=False):
 
 DatetimeValue = Union[DatetimeObject, str]
 BooleanValue = bool
-NullValue = None
 NumberValue = float
 StringValue = str
 
 # Property types
-PROPERTY_TYPE_BOOLEAN = "boolean"
-PROPERTY_TYPE_DATETIME = "datetime"
-PROPERTY_TYPE_NULL = "null"
-PROPERTY_TYPE_NUMBER = "number"
-PROPERTY_TYPE_STRING = "string"
-
-PropertyType = Literal[
-    PROPERTY_TYPE_BOOLEAN,
-    PROPERTY_TYPE_DATETIME,
-    PROPERTY_TYPE_NULL,
-    PROPERTY_TYPE_NUMBER,
-    PROPERTY_TYPE_STRING,
-]
+PropertyType = Literal["boolean", "datetime", "null", "number", "string"]
 
 
 class Property(TypedDict):
@@ -53,10 +40,10 @@ class PropertyWithValue(Property):
     value: Union[
         DatetimeValue,
         BooleanValue,
-        NullValue,
+        None,
         NumberValue,
         StringValue,
-        List[Union[DatetimeValue, BooleanValue, NullValue, NumberValue, StringValue]],
+        List[Union[DatetimeValue, BooleanValue, None, NumberValue, StringValue]],
     ]
 
 

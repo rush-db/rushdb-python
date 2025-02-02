@@ -1,3 +1,4 @@
+import typing
 from typing import List, Literal, Optional
 
 from ..models.property import Property, PropertyValuesData
@@ -15,21 +16,20 @@ class PropertiesAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> List[Property]:
         """List all properties."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
-            "POST", "/api/v1/properties", query or {}, headers
+            "POST",
+            "/api/v1/properties",
+            typing.cast(typing.Dict[str, typing.Any], query or {}),
+            headers,
         )
 
     def find_by_id(
         self, property_id: str, transaction: Optional[Transaction] = None
     ) -> Property:
         """Get a property by ID."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
             "GET", f"/api/v1/properties/{property_id}", headers=headers
@@ -39,9 +39,7 @@ class PropertiesAPI(BaseAPI):
         self, property_id: str, transaction: Optional[Transaction] = None
     ) -> None:
         """Delete a property."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
             "DELETE", f"/api/v1/properties/{property_id}", headers=headers
@@ -56,9 +54,7 @@ class PropertiesAPI(BaseAPI):
         transaction: Optional[Transaction] = None,
     ) -> PropertyValuesData:
         """Get values data for a property."""
-        headers = Transaction._build_transaction_header(
-            transaction.id if transaction else None
-        )
+        headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
             "GET",
