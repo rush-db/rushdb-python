@@ -1,122 +1,150 @@
-# RushDB Python SDK
+<div align="center">
 
-A modern Python client for RushDB, a graph database built for modern applications.
+![RushDB Logo](https://raw.githubusercontent.com/rush-db/rushdb/main/rushdb-logo.svg)
+
+# RushDB Python SDK
+### The Instant Database for Modern Apps and DS/ML Ops
+
+RushDB is an open-source database built on Neo4j, designed to simplify application development.
+
+It automates data normalization, manages relationships, and infers data types, enabling developers to focus on building features rather than wrestling with data.
+
+[🌐 Homepage](https://rushdb.com) — [📢 Blog](https://rushdb.com/blog) — [☁️ Platform ](https://app.rushdb.com) — [📚 Docs](https://docs.rushdb.com) — [🧑‍💻 Examples](https://github.com/rush-db/rushdb/examples)
+</div>
+
+## 🚀 Feature Highlights
+
+### 1. **Data modeling is optional**
+Push data of any shape—RushDB handles relationships, data types, and more automatically.
+
+### 2. **Automatic type inference**
+Minimizes overhead while optimizing performance for high-speed searches.
+
+### 3. **Powerful search API**
+Query data with accuracy using the graph-powered search API.
+
+### 4. **Flexible data import**
+Easily import data in `JSON`, `CSV`, or `JSONB`, creating data-rich applications fast.
+
+### 5. **Developer-Centric Design**
+RushDB prioritizes DX with an intuitive and consistent API.
+
+### 6. **REST API Readiness**
+A REST API with SDK-like DX for every operation: manage relationships, create, delete, and search effortlessly. Same DTO everywhere.
+
+---
 
 ## Installation
 
-```bash
+Install the RushDB Python SDK via pip:
+
+```sh
 pip install rushdb
 ```
 
-## Quick Start
+---
+
+## Usage
+
+### **1. Setup SDK**
 
 ```python
-from src.rushdb import RushDBClient
+from rushdb import RushDB
 
-# Initialize the client
-client = RushDBClient("http://localhost:8000", "your-api-key")
+db = RushDB("API_TOKEN", url="https://api.rushdb.com")
+```
 
-# Create a record
-record = client.records.create({
-    "name": "John Doe",
-    "age": 30,
-    "email": "john@example.com"
-})
+---
 
-# Find records
-results = client.records.find({
+### **2. Push any JSON data**
+
+```python
+company_data = {
+    "label": "COMPANY",
+    "payload": {
+        "name": "Google LLC",
+        "address": "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
+        "foundedAt": "1998-09-04T00:00:00.000Z",
+        "rating": 4.9,
+        "DEPARTMENT": [{
+            "name": "Research & Development",
+            "description": "Innovating and creating advanced technologies for AI, cloud computing, and consumer devices.",
+            "PROJECT": [{
+                "name": "Bard AI",
+                "description": "A state-of-the-art generative AI model for natural language understanding and creation.",
+                "active": True,
+                "budget": 1200000000,
+                "EMPLOYEE": [{
+                    "name": "Jeff Dean",
+                    "position": "Head of AI Research",
+                    "email": "jeff@google.com",
+                    "dob": "1968-07-16T00:00:00.000Z",
+                    "salary": 3000000
+                }]
+            }]
+        }]
+    }
+}
+
+db.records.create_many(company_data)
+```
+
+---
+
+### **3. Find Records by specific criteria**
+
+```python
+query = {
+    "labels": ["EMPLOYEE"],
     "where": {
-        "age": {"$gt": 25},
-        "status": "active"
-    },
-    "orderBy": {"created_at": "desc"},
-    "limit": 10
-})
+        "position": {"$contains": "AI"},
+        "PROJECT": {
+            "DEPARTMENT": {
+                "COMPANY": {
+                    "rating": {"$gte": 4}
+                }
+            }
+        }
+    }
+}
 
-# Create relations
-client.records.attach(
-    source_id="user123",
-    target_ids=["order456"],
-    relation_type="PLACED_ORDER"
-)
+matched_employees = db.records.find(query)
 
-# Use transactions
-tx_id = client.transactions.begin()
-try:
-    client.records.create({"name": "Alice"}, transaction_id=tx_id)
-    client.records.create({"name": "Bob"}, transaction_id=tx_id)
-    client.transactions.commit(tx_id)
-except Exception:
-    client.transactions.rollback(tx_id)
-    raise
+company = db.records.find_uniq("COMPANY", {"where": {"name": "Google LLC"}})
 ```
 
-## Features
+---
 
-- Full TypeScript-like type hints
-- Transaction support
-- Comprehensive query builder
-- Graph traversal
-- Property management
-- Label management
-- Error handling
-- Connection pooling (with requests)
+### **4. Use REST API with cURL**
 
-## API Documentation
-
-### Records API
-
-```python
-client.records.find(query)  # Find records matching query
-client.records.find_by_id(id_or_ids)  # Find records by ID(s)
-client.records.find_one(query)  # Find single record
-client.records.find_unique(query)  # Find unique record
-client.records.create(data)  # Create record
-client.records.create_many(data)  # Create multiple records
-client.records.delete(query)  # Delete records matching query
-client.records.delete_by_id(id_or_ids)  # Delete records by ID(s)
-client.records.attach(source_id, target_ids, relation_type)  # Create relations
-client.records.detach(source_id, target_ids, type_or_types)  # Remove relations
-client.records.export(query)  # Export records to CSV
+```sh
+curl -X POST https://api.rushdb.com/api/v1/records/search \
+-H "Authorization: Bearer API_TOKEN" \
+-H "Content-Type: application/json" \
+-d '{
+  "labels": ["EMPLOYEE"],
+  "where": {
+    "position": { "$contains": "AI" },
+    "PROJECT": {
+      "DEPARTMENT": {
+        "COMPANY": {
+          "rating": { "$gte": 4 }
+        }
+      }
+    }
+  }
+}'
 ```
 
-### Properties API
+<div align="center">
+<b>You Rock</b>  🚀
+</div>
 
-```python
-client.properties.list()  # List all properties
-client.properties.create(data)  # Create property
-client.properties.get(property_id)  # Get property
-client.properties.update(property_id, data)  # Update property
-client.properties.delete(property_id)  # Delete property
-client.properties.get_values(property_id)  # Get property values
-```
+---
 
-### Labels API
+<div align="center" style="margin-top: 20px">
 
-```python
-client.labels.list()  # List all labels
-client.labels.create(label)  # Create label
-client.labels.delete(label)  # Delete label
-```
+> Check the [Documentation](https://docs.rushdb.com) and [Examples](https://github.com/rush-db/rushdb/examples) to learn more 🧐
 
-### Transactions API
+</div>
 
-```python
-client.transactions.begin()  # Start transaction
-client.transactions.commit(transaction_id)  # Commit transaction
-client.transactions.rollback(transaction_id)  # Rollback transaction
-```
-
-## Development
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run tests
-python -m unittest discover tests
-```
-
-## License
-
-MIT License 
