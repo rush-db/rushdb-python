@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Dict, Optional, Union
 from ..common import RushDBError
 
 if TYPE_CHECKING:
-    from ..client import RushDBClient
+    from ..client import RushDB
 
 
 class Transaction:
     """Represents a RushDB transaction."""
 
-    def __init__(self, client: "RushDBClient", transaction_id: str):
+    def __init__(self, client: "RushDB", transaction_id: str):
         self.client = client
         self.id = transaction_id
         self._committed = False

@@ -13,7 +13,7 @@ from .api.transactions import TransactionsAPI
 from .common import RushDBError
 
 
-class RushDBClient:
+class RushDB:
     """Main client for interacting with RushDB."""
 
     DEFAULT_BASE_URL = "https://api.rushdb.com"

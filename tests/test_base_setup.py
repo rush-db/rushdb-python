@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.rushdb import RushDBClient, RushDBError
+from src.rushdb import RushDB, RushDBError
 
 
 def load_env():
@@ -44,7 +44,7 @@ class TestBase(unittest.TestCase):
 
     def setUp(self):
         """Set up test client."""
-        self.client = RushDBClient(self.token, base_url=self.base_url)
+        self.client = RushDB(self.token, base_url=self.base_url)
 
         # Verify connection
         try:

@@ -5,15 +5,13 @@ from .relationship import RelationshipDetachOptions, RelationshipOptions
 from .transaction import Transaction
 
 if TYPE_CHECKING:
-    from ..client import RushDBClient
+    from ..client import RushDB
 
 
 class Record:
     """Represents a record in RushDB with methods for manipulation."""
 
-    def __init__(
-        self, client: "RushDBClient", data: Union[Dict[str, Any], None] = None
-    ):
+    def __init__(self, client: "RushDB", data: Union[Dict[str, Any], None] = None):
         self._client = client
         # Handle different data formats
         if isinstance(data, dict):
