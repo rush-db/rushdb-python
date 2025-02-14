@@ -49,6 +49,7 @@ class PropertiesAPI(BaseAPI):
         self,
         property_id: str,
         sort: Optional[Literal["asc", "desc"]],
+        query: Optional[str],
         skip: Optional[int],
         limit: Optional[int],
         transaction: Optional[Transaction] = None,
@@ -60,5 +61,5 @@ class PropertiesAPI(BaseAPI):
             "GET",
             f"/api/v1/properties/{property_id}/values",
             headers=headers,
-            params={"sort": sort, "skip": skip, "limit": limit},
+            params={"sort": sort, "skip": skip, "limit": limit, "query": query},
         )
