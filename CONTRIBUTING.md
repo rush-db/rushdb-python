@@ -41,3 +41,22 @@ For urgent issues or further assistance, you can reach out directly:
 - **LinkedIn**: [linkedin.com/onepx](https://linkedin.com/in/onepx)
 
 We appreciate your contributions and look forward to your feedback!
+
+--- 
+## Poetry commands
+
+```
+poetry run isort . --check
+```
+
+```
+poetry run mypy src/rushdb
+```
+
+```
+poetry run black .
+```
+
+```
+poetry run ruff check .
+```
