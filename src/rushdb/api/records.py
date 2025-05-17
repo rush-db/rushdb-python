@@ -59,7 +59,7 @@ class RecordsAPI(BaseAPI):
 
         payload = {
             "label": label,
-            "payload": data,
+            "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
         response = self.client._make_request(
@@ -89,7 +89,7 @@ class RecordsAPI(BaseAPI):
 
         payload = {
             "label": label,
-            "payload": data,
+            "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
         response = self.client._make_request(
@@ -120,7 +120,7 @@ class RecordsAPI(BaseAPI):
         if options:
             payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
-            "POST", f"/api/v1/records/{source_id}/relations", payload, headers
+            "POST", f"/api/v1/relationships/{source_id}", payload, headers
         )
 
     def detach(
@@ -146,7 +146,7 @@ class RecordsAPI(BaseAPI):
         if options:
             payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
-            "PUT", f"/api/v1/records/{source_id}/relations", payload, headers
+            "PUT", f"/api/v1/relationships/{source_id}", payload, headers
         )
 
     def delete(
@@ -219,7 +219,7 @@ class RecordsAPI(BaseAPI):
 
         payload = {
             "label": label,
-            "payload": csv_data,
+            "data": csv_data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
 

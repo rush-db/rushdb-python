@@ -44,7 +44,7 @@ class RelationsAPI(BaseAPI):
 
         # Construct path with query string
         query_string = f"?{urlencode(query_params)}" if query_params else ""
-        path = f"/records/relations/search{query_string}"
+        path = f"/relationships/search{query_string}"
 
         # Build headers with transaction if present
         headers = Transaction._build_transaction_header(transaction)
