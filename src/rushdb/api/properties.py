@@ -20,7 +20,7 @@ class PropertiesAPI(BaseAPI):
 
         return self.client._make_request(
             "POST",
-            "/api/v1/properties",
+            "/api/v1/properties/search",
             typing.cast(typing.Dict[str, typing.Any], query or {}),
             headers,
         )

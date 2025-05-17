@@ -3,219 +3,123 @@
 ![RushDB Logo](https://raw.githubusercontent.com/rush-db/rushdb/main/rushdb-logo.svg)
 
 # RushDB Python SDK
+
 ![PyPI - Version](https://img.shields.io/pypi/v/rushdb)
-
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/rushdb)
-
 ![PyPI - License](https://img.shields.io/pypi/l/rushdb)
 
 RushDB is an instant database for modern apps and DS/ML ops built on top of Neo4j.
+It automates data normalization, manages relationships, and infers data types.
 
-It automates data normalization, manages relationships, and infers data types, enabling developers to focus on building features rather than wrestling with data.
+[📖 Documentation](https://docs.rushdb.com/python-sdk/introduction) • [🌐 Website](https://rushdb.com) • [☁️ Cloud Platform](https://app.rushdb.com)
 
-[🌐 Homepage](https://rushdb.com) — [📢 Blog](https://rushdb.com/blog) — [☁️ Platform ](https://app.rushdb.com) — [📚 Docs](https://docs.rushdb.com/python-sdk/records-api) — [🧑‍💻 Examples](https://github.com/rush-db/examples)
 </div>
 
----
-
 ## Installation
-
-Install the RushDB Python SDK via pip:
-
 
 ```sh
 pip install rushdb
 ```
 
----
-
-## Usage
-
-### **1. Setup SDK**
+## Quick Start
 
 ```python
 from rushdb import RushDB
 
-db = RushDB("API_TOKEN", base_url="https://api.rushdb.com")
+# Initialize the client
+db = RushDB("YOUR_API_TOKEN")
+
+# Create a record
+user = db.records.create(
+    label="USER",
+    data={
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30
+    }
+)
+
+# Find records
+results = db.records.find({
+    "where": {
+        "age": {"$gte": 18},
+        "name": {"$startsWith": "J"}
+    },
+    "limit": 10
+})
+
+# Create relationships
+company = db.records.create(
+    label="COMPANY",
+    data={"name": "Acme Inc."}
+)
+
+# Attach records with a relationship
+user.attach(
+    target=company,
+    options={"type": "WORKS_AT", "direction": "out"}
+)
 ```
 
----
+## Pushing Nested JSON
 
-### **2. Push any JSON data**
-
+RushDB automatically normalizes nested objects into a graph structure:
 
 ```python
-company_data = {
+# Push nested JSON with automatic relationship creation
+db.records.create_many("COMPANY", {
     "name": "Google LLC",
-    "address": "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
-    "foundedAt": "1998-09-04T00:00:00.000Z",
     "rating": 4.9,
     "DEPARTMENT": [{
         "name": "Research & Development",
-        "description": "Innovating and creating advanced technologies for AI, cloud computing, and consumer devices.",
         "PROJECT": [{
             "name": "Bard AI",
-            "description": "A state-of-the-art generative AI model for natural language understanding and creation.",
-            "active": True,
-            "budget": 1200000000,
             "EMPLOYEE": [{
                 "name": "Jeff Dean",
-                "position": "Head of AI Research",
-                "email": "jeff@google.com",
-                "dob": "1968-07-16T00:00:00.000Z",
-                "salary": 3000000
+                "position": "Head of AI Research"
             }]
         }]
     }]
-}
-
-db.records.create_many("COMPANY", company_data)
+})
 ```
 
-This operation will create 4 Records with proper data types and relationships according to this structure:
+## Complete Documentation
 
-```cypher
-(Record:COMPANY)
-  -[r0:RUSHDB_DEFAULT_RELATION]->
-    (Record:DEPARTMENT)
-      -[r1:RUSHDB_DEFAULT_RELATION]->
-        (Record:PROJECT) 
-          -[r2:RUSHDB_DEFAULT_RELATION]->
-            (Record:EMPLOYEE)
-```
+For comprehensive documentation, tutorials, and examples, please visit:
+
+**[docs.rushdb.com/python-sdk](https://docs.rushdb.com/python-sdk/introduction)**
+
+Documentation includes:
+
+- Complete Records API reference
+- Relationship management
+- Complex query examples
+- Transaction usage
+- Vector search capabilities
+- Data import tools
+
+## Support
+
+- [GitHub Issues](https://github.com/rush-db/rushdb-python/issues) - Bug reports and feature requests
+- [Discord Community](https://discord.gg/rushdb) - Get help from the community
+- [Email Support](mailto:support@rushdb.com) - Direct support from the RushDB team
 
 ---
 
-### **3. Find Records by specific criteria**
-
-```python
-query = {
-    "labels": ["EMPLOYEE"],
-    "where": {
-        "position": {"$contains": "AI"},
-        "PROJECT": {
-            "DEPARTMENT": {
-                "COMPANY": {
-                    "rating": {"$gte": 4}
-                }
-            }
-        }
-    }
-}
-
-matched_employees = db.records.find(query)
-
-company = db.records.find_uniq("COMPANY", {"where": {"name": "Google LLC"}})
-```
-
----
-
-
-# Documentation
-
-# RecordsAPI Documentation
-
-The `RecordsAPI` class provides methods for managing records in RushDB. It handles record creation, updates, deletion, searching, and relationship management.
-
-## Methods
-
-### create()
-
-Creates a new record in RushDB.
-
-**Signature:**
-```python
-def create(
-    self,
-    label: str,
-    data: Dict[str, Any],
-    options: Optional[Dict[str, bool]] = None,
-    transaction: Optional[Transaction] = None
-) -> Record
-```
-
-**Arguments:**
-- `label` (str): Label for the record
-- `data` (Dict[str, Any]): Record data
-- `options` (Optional[Dict[str, bool]]): Optional parsing and response options
-  - `returnResult` (bool): Whether to return the created record
-  - `suggestTypes` (bool): Whether to suggest property types
-- `transaction` (Optional[Transaction]): Optional transaction object
-
-**Returns:**
-- `Record`: Created record object
-
-**Example:**
-```python
-# Create a new company record
-data = {
-    "name": "Google LLC",
-    "address": "1600 Amphitheatre Parkway",
-    "foundedAt": "1998-09-04T00:00:00.000Z",
-    "rating": 4.9
-}
-
-record = db.records.create(
-    label="COMPANY",
-    data=data,
-    options={"returnResult": True, "suggestTypes": True}
-)
-```
-
-### create_many()
-
-Creates multiple records in a single operation.
-
-**Signature:**
-```python
-def create_many(
-    self,
-    label: str,
-    data: Union[Dict[str, Any], List[Dict[str, Any]]],
-    options: Optional[Dict[str, bool]] = None,
-    transaction: Optional[Transaction] = None
-) -> List[Record]
-```
-
-**Arguments:**
-- `label` (str): Label for all records
-- `data` (Union[Dict[str, Any], List[Dict[str, Any]]]): List or Dict of record data
-- `options` (Optional[Dict[str, bool]]): Optional parsing and response options
-- `transaction` (Optional[Transaction]): Optional transaction object
-
-**Returns:**
-- `List[Record]`: List of created record objects
-
-**Example:**
-```python
-# Create multiple company records
-data = [
-    {
-        "name": "Apple Inc",
-        "address": "One Apple Park Way",
-        "foundedAt": "1976-04-01T00:00:00.000Z",
-        "rating": 4.8
-    },
-    {
-        "name": "Microsoft Corporation",
-        "address": "One Microsoft Way",
-        "foundedAt": "1975-04-04T00:00:00.000Z",
-        "rating": 4.7
-    }
-]
-
-records = db.records.create_many(
-    label="COMPANY",
-    data=data,
-    options={"returnResult": True, "suggestTypes": True}
-)
-```
+<div align="center">
+  <p>
+    <a href="https://docs.rushdb.com/python-sdk/introduction">
+      <img src="https://img.shields.io/badge/Full_Documentation-docs.rushdb.com-6D28D9?style=for-the-badge" alt="View Documentation" />
+    </a>
+  </p>
+</div>
 
 ### set()
 
 Updates a record by ID, replacing all data.
 
 **Signature:**
+
 ```python
 def set(
     self,
@@ -226,14 +130,17 @@ def set(
 ```
 
 **Arguments:**
+
 - `record_id` (str): ID of the record to update
 - `data` (Dict[str, Any]): New record data
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Update entire record data
 new_data = {
@@ -252,6 +159,7 @@ response = db.records.set(
 Updates specific fields of a record by ID.
 
 **Signature:**
+
 ```python
 def update(
     self,
@@ -262,14 +170,17 @@ def update(
 ```
 
 **Arguments:**
+
 - `record_id` (str): ID of the record to update
 - `data` (Dict[str, Any]): Partial record data to update
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Update specific fields
 updates = {
@@ -288,6 +199,7 @@ response = db.records.update(
 Searches for records matching specified criteria.
 
 **Signature:**
+
 ```python
 def find(
     self,
@@ -298,14 +210,17 @@ def find(
 ```
 
 **Arguments:**
+
 - `query` (Optional[SearchQuery]): Search query parameters
 - `record_id` (Optional[str]): Optional record ID to search from
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `List[Record]`: List of matching records
 
 **Example:**
+
 ```python
 # Search for records with complex criteria
 query = {
@@ -328,6 +243,7 @@ records = db.records.find(query=query)
 Deletes records matching a query.
 
 **Signature:**
+
 ```python
 def delete(
     self,
@@ -337,13 +253,16 @@ def delete(
 ```
 
 **Arguments:**
+
 - `query` (SearchQuery): Query to match records for deletion
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Delete records matching criteria
 query = {
@@ -361,6 +280,7 @@ response = db.records.delete(query)
 Deletes one or more records by ID.
 
 **Signature:**
+
 ```python
 def delete_by_id(
     self,
@@ -370,13 +290,16 @@ def delete_by_id(
 ```
 
 **Arguments:**
+
 - `id_or_ids` (Union[str, List[str]]): Single ID or list of IDs to delete
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Delete single record
 response = db.records.delete_by_id("record-123")
@@ -394,6 +317,7 @@ response = db.records.delete_by_id([
 Creates relationships between records.
 
 **Signature:**
+
 ```python
 def attach(
     self,
@@ -405,6 +329,7 @@ def attach(
 ```
 
 **Arguments:**
+
 - `source` (Union[str, Dict[str, Any]]): Source record ID or data
 - `target` (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]): Target record(s)
 - `options` (Optional[RelationshipOptions]): Relationship options
@@ -413,9 +338,11 @@ def attach(
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Create relationship between records
 options = RelationshipOptions(
@@ -435,6 +362,7 @@ response = db.records.attach(
 Removes relationships between records.
 
 **Signature:**
+
 ```python
 def detach(
     self,
@@ -446,6 +374,7 @@ def detach(
 ```
 
 **Arguments:**
+
 - `source` (Union[str, Dict[str, Any]]): Source record ID or data
 - `target` (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]): Target record(s)
 - `options` (Optional[RelationshipDetachOptions]): Detach options
@@ -454,9 +383,11 @@ def detach(
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Remove relationships between records
 options = RelationshipDetachOptions(
@@ -476,6 +407,7 @@ response = db.records.detach(
 Imports records from CSV data.
 
 **Signature:**
+
 ```python
 def import_csv(
     self,
@@ -487,15 +419,18 @@ def import_csv(
 ```
 
 **Arguments:**
+
 - `label` (str): Label for imported records
 - `csv_data` (Union[str, bytes]): CSV data to import
 - `options` (Optional[Dict[str, bool]]): Import options
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `List[Dict[str, Any]]`: Imported records data
 
 **Example:**
+
 ```python
 # Import records from CSV
 csv_data = """name,age,department,role
@@ -532,6 +467,7 @@ Gets the record's unique identifier.
 **Type:** `str`
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John"})
 print(record.id)  # e.g., "1234abcd-5678-..."
@@ -544,6 +480,7 @@ Gets the record's property types.
 **Type:** `str`
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John", "age": 25})
 print(record.proptypes)  # Returns property type definitions
@@ -556,6 +493,7 @@ Gets the record's label.
 **Type:** `str`
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John"})
 print(record.label)  # "USER"
@@ -568,6 +506,7 @@ Gets the record's creation timestamp from its ID.
 **Type:** `int`
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John"})
 print(record.timestamp)  # Unix timestamp in milliseconds
@@ -580,6 +519,7 @@ Gets the record's creation date.
 **Type:** `datetime`
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John"})
 print(record.date)  # datetime object
@@ -592,6 +532,7 @@ print(record.date)  # datetime object
 Updates all data for the record.
 
 **Signature:**
+
 ```python
 def set(
     self,
@@ -601,13 +542,16 @@ def set(
 ```
 
 **Arguments:**
+
 - `data` (Dict[str, Any]): New record data
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {"name": "John"})
 response = record.set({
@@ -622,6 +566,7 @@ response = record.set({
 Updates specific fields of the record.
 
 **Signature:**
+
 ```python
 def update(
     self,
@@ -631,13 +576,16 @@ def update(
 ```
 
 **Arguments:**
+
 - `data` (Dict[str, Any]): Partial record data to update
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 record = db.records.create("USER", {
     "name": "John",
@@ -653,6 +601,7 @@ response = record.update({
 Creates relationships with other records.
 
 **Signature:**
+
 ```python
 def attach(
     self,
@@ -663,6 +612,7 @@ def attach(
 ```
 
 **Arguments:**
+
 - `target` (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]): Target record(s)
 - `options` (Optional[RelationshipOptions]): Relationship options
   - `direction` (Optional[Literal["in", "out"]]): Relationship direction
@@ -670,9 +620,11 @@ def attach(
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Create two records
 user = db.records.create("USER", {"name": "John"})
@@ -693,6 +645,7 @@ response = user.attach(
 Removes relationships with other records.
 
 **Signature:**
+
 ```python
 def detach(
     self,
@@ -703,6 +656,7 @@ def detach(
 ```
 
 **Arguments:**
+
 - `target` (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]): Target record(s)
 - `options` (Optional[RelationshipDetachOptions]): Detach options
   - `direction` (Optional[Literal["in", "out"]]): Relationship direction
@@ -710,9 +664,11 @@ def detach(
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 # Detach user from group
 response = user.detach(
@@ -729,6 +685,7 @@ response = user.detach(
 Deletes the record.
 
 **Signature:**
+
 ```python
 def delete(
     self,
@@ -737,12 +694,15 @@ def delete(
 ```
 
 **Arguments:**
+
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Dict[str, str]`: Response data
 
 **Example:**
+
 ```python
 user = db.records.create("USER", {"name": "John"})
 response = user.delete()
@@ -823,26 +783,26 @@ with db.transactions.begin() as transaction:
         {"name": "John Doe"},
         transaction=transaction
     )
-    
+
     # Update user
     user.update(
         {"status": "active"},
         transaction=transaction
     )
-    
+
     # Create and attach department
     dept = db.records.create(
         "DEPARTMENT",
         {"name": "Engineering"},
         transaction=transaction
     )
-    
+
     user.attach(
         target=dept,
         options=RelationshipOptions(type="BELONGS_TO"),
         transaction=transaction
     )
-    
+
     # Transaction will automatically commit if no errors occur
     # If an error occurs, it will automatically rollback
 ```
@@ -866,6 +826,7 @@ class PropertiesAPI(BaseAPI):
 Retrieves a list of properties based on optional search criteria.
 
 **Signature:**
+
 ```python
 def find(
     self,
@@ -875,16 +836,19 @@ def find(
 ```
 
 **Arguments:**
+
 - `query` (Optional[SearchQuery]): Search query parameters for filtering properties
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `List[Property]`: List of properties matching the search criteria
 
 **Example:**
+
 ```python
 # Find all properties
-properties = client.properties.find()
+properties = db.properties.find()
 
 # Find properties with specific criteria
 query = {
@@ -894,7 +858,7 @@ query = {
     },
     "limit": 10  # Limit to 10 results
 }
-filtered_properties = client.properties.find(query)
+filtered_properties = db.properties.find(query)
 ```
 
 ### find_by_id()
@@ -902,6 +866,7 @@ filtered_properties = client.properties.find(query)
 Retrieves a specific property by its ID.
 
 **Signature:**
+
 ```python
 def find_by_id(
     self,
@@ -911,16 +876,19 @@ def find_by_id(
 ```
 
 **Arguments:**
+
 - `property_id` (str): Unique identifier of the property
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `Property`: Property details
 
 **Example:**
+
 ```python
 # Retrieve a specific property by ID
-property_details = client.properties.find_by_id("prop_123456")
+property_details = db.properties.find_by_id("prop_123456")
 ```
 
 ### delete()
@@ -928,6 +896,7 @@ property_details = client.properties.find_by_id("prop_123456")
 Deletes a property by its ID.
 
 **Signature:**
+
 ```python
 def delete(
     self,
@@ -937,16 +906,19 @@ def delete(
 ```
 
 **Arguments:**
+
 - `property_id` (str): Unique identifier of the property to delete
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `None`
 
 **Example:**
+
 ```python
 # Delete a property
-client.properties.delete("prop_123456")
+db.properties.delete("prop_123456")
 ```
 
 ### values()
@@ -954,6 +926,7 @@ client.properties.delete("prop_123456")
 Retrieves values for a specific property with optional sorting and pagination.
 
 **Signature:**
+
 ```python
 def values(
     self,
@@ -966,6 +939,7 @@ def values(
 ```
 
 **Arguments:**
+
 - `property_id` (str): Unique identifier of the property
 - `sort` (Optional[Literal["asc", "desc"]]): Sort order of values
 - `skip` (Optional[int]): Number of values to skip (for pagination)
@@ -973,12 +947,14 @@ def values(
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
+
 - `PropertyValuesData`: Property values data, including optional min/max and list of values
 
 **Example:**
+
 ```python
 # Get property values
-values_data = client.properties.values(
+values_data = db.properties.values(
     property_id="prop_age",
     sort="desc",  # Sort values in descending order
     skip=0,       # Start from the first value
@@ -995,7 +971,7 @@ print(values_data.get('max'))         # Maximum value (for numeric properties)
 
 ```python
 # Find all properties
-all_properties = client.properties.find()
+all_properties = db.properties.find()
 for prop in all_properties:
     print(f"Property ID: {prop['id']}")
     print(f"Name: {prop['name']}")
@@ -1011,12 +987,12 @@ query = {
     },
     "limit": 5  # Limit to 5 results
 }
-numeric_score_properties = client.properties.find(query)
+numeric_score_properties = db.properties.find(query)
 
 # Get values for a specific property
 if numeric_score_properties:
     first_prop = numeric_score_properties[0]
-    prop_values = client.properties.values(
+    prop_values = db.properties.values(
         property_id=first_prop['id'],
         sort="desc",
         limit=50
@@ -1024,15 +1000,16 @@ if numeric_score_properties:
     print(f"Values for {first_prop['name']}:")
     print(f"Min: {prop_values.get('min')}")
     print(f"Max: {prop_values.get('max')}")
-    
+
     # Detailed property examination
-    detailed_prop = client.properties.find_by_id(first_prop['id'])
+    detailed_prop = db.properties.find_by_id(first_prop['id'])
     print("Detailed Property Info:", detailed_prop)
 ```
 
 ## Property Types and Structures
 
 RushDB supports the following property types:
+
 - `"boolean"`: True/False values
 - `"datetime"`: Date and time values
 - `"null"`: Null/empty values
@@ -1040,6 +1017,7 @@ RushDB supports the following property types:
 - `"string"`: Text values
 
 ### Property Structure Example
+
 ```python
 property = {
     "id": "prop_unique_id",
@@ -1062,14 +1040,14 @@ Properties API methods support optional transactions for atomic operations:
 
 ```python
 # Using a transaction
-with client.transactions.begin() as transaction:
+with db.transactions.begin() as transaction:
     # Perform multiple property-related operations
-    property_to_delete = client.properties.find(
+    property_to_delete = db.properties.find(
         {"where": {"name": "temp_property"}},
         transaction=transaction
     )[0]
-    
-    client.properties.delete(
+
+    db.properties.delete(
         property_id=property_to_delete['id'],
         transaction=transaction
     )
@@ -1083,7 +1061,7 @@ When working with the PropertiesAPI, be prepared to handle potential errors:
 ```python
 try:
     # Attempt to find or delete a property
-    property_details = client.properties.find_by_id("non_existent_prop")
+    property_details = db.properties.find_by_id("non_existent_prop")
 except RushDBError as e:
     print(f"Error: {e}")
     print(f"Error Details: {e.details}")

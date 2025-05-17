@@ -19,7 +19,7 @@ class LabelsAPI(BaseAPI):
 
         return self.client._make_request(
             "POST",
-            "/api/v1/labels",
+            "/api/v1/labels/search",
             data=typing.cast(typing.Dict[str, typing.Any], query or {}),
             headers=headers,
         )
