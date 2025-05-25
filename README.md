@@ -203,7 +203,7 @@ Searches for records matching specified criteria.
 ```python
 def find(
     self,
-    query: Optional[SearchQuery] = None,
+    search_query: Optional[SearchQuery] = None,
     record_id: Optional[str] = None,
     transaction: Optional[Transaction] = None
 ) -> List[Record]
@@ -830,7 +830,7 @@ Retrieves a list of properties based on optional search criteria.
 ```python
 def find(
     self,
-    query: Optional[SearchQuery] = None,
+    search_query: Optional[SearchQuery] = None,
     transaction: Optional[Transaction] = None
 ) -> List[Property]
 ```

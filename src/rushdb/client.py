@@ -16,14 +16,14 @@ from .common import RushDBError
 class RushDB:
     """Main client for interacting with RushDB."""
 
-    DEFAULT_BASE_URL = "https://api.rushdb.com"
+    DEFAULT_BASE_URL = "https://api.rushdb.com/api/v1"
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
         """Initialize the RushDB client.
 
         Args:
             api_key: The API key for authentication
-            base_url: Optional base URL for the RushDB server (default: https://api.rushdb.com)
+            base_url: Optional base URL for the RushDB server (default: https://api.rushdb.com/api/v1)
         """
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.api_key = api_key

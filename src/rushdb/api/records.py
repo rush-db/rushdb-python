@@ -20,7 +20,7 @@ class RecordsAPI(BaseAPI):
         """Update a record by ID."""
         headers = Transaction._build_transaction_header(transaction)
         return self.client._make_request(
-            "PUT", f"/api/v1/records/{record_id}", data, headers
+            "PUT", f"/records/{record_id}", data, headers
         )
 
     def update(
@@ -33,7 +33,7 @@ class RecordsAPI(BaseAPI):
         headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
-            "PATCH", f"/api/v1/records/{record_id}", data, headers
+            "PATCH", f"/records/{record_id}", data, headers
         )
 
     def create(
@@ -63,7 +63,7 @@ class RecordsAPI(BaseAPI):
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
         response = self.client._make_request(
-            "POST", "/api/v1/records", payload, headers
+            "POST", "/records", payload, headers
         )
         return Record(self.client, response.get("data"))
 
@@ -93,7 +93,7 @@ class RecordsAPI(BaseAPI):
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
         response = self.client._make_request(
-            "POST", "/api/v1/records/import/json", payload, headers
+            "POST", "/records/import/json", payload, headers
         )
         return [Record(self.client, record) for record in response.get("data")]
 
@@ -120,7 +120,7 @@ class RecordsAPI(BaseAPI):
         if options:
             payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
-            "POST", f"/api/v1/relationships/{source_id}", payload, headers
+            "POST", f"/relationships/{source_id}", payload, headers
         )
 
     def detach(
@@ -146,19 +146,19 @@ class RecordsAPI(BaseAPI):
         if options:
             payload.update(typing.cast(typing.Dict[str, typing.Any], options))
         return self.client._make_request(
-            "PUT", f"/api/v1/relationships/{source_id}", payload, headers
+            "PUT", f"/relationships/{source_id}", payload, headers
         )
 
     def delete(
-        self, query: SearchQuery, transaction: Optional[Transaction] = None
+        self, search_query: SearchQuery, transaction: Optional[Transaction] = None
     ) -> Dict[str, str]:
         """Delete records matching the query."""
         headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
-            "PUT",
-            "/api/v1/records/delete",
-            typing.cast(typing.Dict[str, typing.Any], query or {}),
+            "POST",
+            "/records/delete",
+            typing.cast(typing.Dict[str, typing.Any], search_query or {}),
             headers,
         )
 
@@ -172,18 +172,18 @@ class RecordsAPI(BaseAPI):
 
         if isinstance(id_or_ids, list):
             return self.client._make_request(
-                "PUT",
-                "/api/v1/records/delete",
+                "POST",
+                "/records/delete",
                 {"limit": 1000, "where": {"$id": {"$in": id_or_ids}}},
                 headers,
             )
         return self.client._make_request(
-            "DELETE", f"/api/v1/records/{id_or_ids}", None, headers
+            "DELETE", f"/records/{id_or_ids}", None, headers
         )
 
     def find(
         self,
-        query: Optional[SearchQuery] = None,
+        search_query: Optional[SearchQuery] = None,
         record_id: Optional[str] = None,
         transaction: Optional[Transaction] = None,
     ) -> List[Record]:
@@ -193,14 +193,14 @@ class RecordsAPI(BaseAPI):
             headers = Transaction._build_transaction_header(transaction)
 
             path = (
-                f"/api/v1/records/{record_id}/search"
+                f"/records/{record_id}/search"
                 if record_id
-                else "/api/v1/records/search"
+                else "/records/search"
             )
             response = self.client._make_request(
                 "POST",
                 path,
-                data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+                data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
                 headers=headers,
             )
             return [Record(self.client, record) for record in response.get("data")]
@@ -224,7 +224,7 @@ class RecordsAPI(BaseAPI):
         }
 
         return self.client._make_request(
-            "POST", "/api/v1/records/import/csv", payload, headers
+            "POST", "/records/import/csv", payload, headers
         )
 
     @staticmethod
