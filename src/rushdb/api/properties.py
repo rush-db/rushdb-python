@@ -2,7 +2,7 @@ import typing
 from typing import List, Optional
 
 from ..models.property import Property, PropertyValuesData
-from ..models.search_query import OrderDirection, SearchQuery
+from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
