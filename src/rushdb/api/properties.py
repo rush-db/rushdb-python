@@ -2,7 +2,7 @@ import typing
 from typing import List, Optional
 
 from ..models.property import Property, PropertyValuesData
-from ..models.search_query import SearchQuery, OrderDirection
+from ..models.search_query import OrderDirection, SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
@@ -12,6 +12,7 @@ class PropertyValuesQuery(SearchQuery, total=False):
 
     query: Optional[str]  # For text search among values
     orderBy: Optional[OrderDirection]  # Simplified to only asc/desc for values
+
 
 class PropertiesAPI(BaseAPI):
     """API for managing properties in RushDB."""

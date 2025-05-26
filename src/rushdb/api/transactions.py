@@ -18,12 +18,8 @@ class TransactionsAPI(BaseAPI):
 
     def _commit(self, transaction_id: str) -> None:
         """Internal method to commit a transaction."""
-        return self.client._make_request(
-            "POST", f"/tx/{transaction_id}/commit", {}
-        )
+        return self.client._make_request("POST", f"/tx/{transaction_id}/commit", {})
 
     def _rollback(self, transaction_id: str) -> None:
         """Internal method to rollback a transaction."""
-        return self.client._make_request(
-            "POST", f"/tx/{transaction_id}/rollback", {}
-        )
+        return self.client._make_request("POST", f"/tx/{transaction_id}/rollback", {})

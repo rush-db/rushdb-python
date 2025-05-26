@@ -19,9 +19,7 @@ class RecordsAPI(BaseAPI):
     ) -> Dict[str, str]:
         """Update a record by ID."""
         headers = Transaction._build_transaction_header(transaction)
-        return self.client._make_request(
-            "PUT", f"/records/{record_id}", data, headers
-        )
+        return self.client._make_request("PUT", f"/records/{record_id}", data, headers)
 
     def update(
         self,
@@ -62,9 +60,7 @@ class RecordsAPI(BaseAPI):
             "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
-        response = self.client._make_request(
-            "POST", "/records", payload, headers
-        )
+        response = self.client._make_request("POST", "/records", payload, headers)
         return Record(self.client, response.get("data"))
 
     def create_many(
@@ -192,11 +188,7 @@ class RecordsAPI(BaseAPI):
         try:
             headers = Transaction._build_transaction_header(transaction)
 
-            path = (
-                f"/records/{record_id}/search"
-                if record_id
-                else "/records/search"
-            )
+            path = f"/records/{record_id}/search" if record_id else "/records/search"
             response = self.client._make_request(
                 "POST",
                 path,
