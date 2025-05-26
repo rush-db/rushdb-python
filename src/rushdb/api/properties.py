@@ -11,8 +11,6 @@ class PropertyValuesQuery(SearchQuery, total=False):
     """Extended SearchQuery for property values endpoint with text search support."""
 
     query: Optional[str]  # For text search among values
-    orderBy: Optional[OrderDirection]  # Simplified to only asc/desc for values
-
 
 class PropertiesAPI(BaseAPI):
     """API for managing properties in RushDB."""
