@@ -12,6 +12,7 @@ class PropertyValuesQuery(SearchQuery, total=False):
 
     query: Optional[str]  # For text search among values
 
+
 class PropertiesAPI(BaseAPI):
     """API for managing properties in RushDB."""
 
