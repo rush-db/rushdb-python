@@ -11,7 +11,7 @@ class LabelsAPI(BaseAPI):
 
     def list(
         self,
-        query: Optional[SearchQuery] = None,
+        search_query: Optional[SearchQuery] = None,
         transaction: Optional[Transaction] = None,
     ) -> List[str]:
         """List all labels."""
@@ -19,7 +19,7 @@ class LabelsAPI(BaseAPI):
 
         return self.client._make_request(
             "POST",
-            "/api/v1/labels/search",
-            data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+            "/labels/search",
+            data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
             headers=headers,
         )

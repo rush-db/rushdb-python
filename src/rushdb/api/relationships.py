@@ -20,7 +20,7 @@ class RelationsAPI(BaseAPI):
 
     async def find(
         self,
-        query: Optional[SearchQuery] = None,
+        search_query: Optional[SearchQuery] = None,
         pagination: Optional[PaginationParams] = None,
         transaction: Optional[Union[Transaction, str]] = None,
     ) -> List[Relationship]:
@@ -33,6 +33,9 @@ class RelationsAPI(BaseAPI):
 
         Returns:
             List of matching relations
+            :param transaction:
+            :param pagination:
+            :param search_query:
         """
         # Build query string for pagination
         query_params = {}
@@ -53,7 +56,7 @@ class RelationsAPI(BaseAPI):
         response = self.client._make_request(
             method="POST",
             path=path,
-            data=typing.cast(typing.Dict[str, typing.Any], query or {}),
+            data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
             headers=headers,
         )
 
