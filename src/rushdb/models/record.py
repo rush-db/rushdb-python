@@ -108,3 +108,9 @@ class Record:
     def __repr__(self) -> str:
         """String representation of record."""
         return f"Record(id='{self.id}')"
+
+    def __getitem__(self, key: str) -> Any:
+        return self.data[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
