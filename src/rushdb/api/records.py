@@ -474,9 +474,11 @@ class RecordsAPI(BaseAPI):
                 data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
                 headers=headers,
             )
-            return [Record(self.client, record) for record in response.get("data")], response.get('total')
+            return [
+                Record(self.client, record) for record in response.get("data")
+            ], response.get("total") or 0
         except Exception:
-            return []
+            return [], 0
 
     def import_csv(
         self,
