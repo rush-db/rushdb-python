@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 from ..models.record import Record
 from ..models.relationship import RelationshipDetachOptions, RelationshipOptions
@@ -427,7 +427,7 @@ class RecordsAPI(BaseAPI):
         search_query: Optional[SearchQuery] = None,
         record_id: Optional[str] = None,
         transaction: Optional[Transaction] = None,
-    ) -> (List[Record], int):
+    ) -> Tuple[List[Record], int]:
         """Search for and retrieve records matching the specified criteria.
 
         Searches the database for records that match the provided search query.
