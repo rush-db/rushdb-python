@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..models.record import Record
 from ..models.relationship import RelationshipDetachOptions, RelationshipOptions
