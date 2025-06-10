@@ -103,9 +103,10 @@ RushDB Python SDK uses a modern `SearchResult` container that follows Python SDK
 
 ### SearchResult Features
 
+- **Generic type support**: Uses Python's typing generics (`SearchResult[T]`) with `RecordSearchResult` as a type alias for `SearchResult[Record]`
 - **List-like access**: Index, slice, and iterate like a regular list
 - **Search context**: Access total count, pagination info, and the original search query
-- **Boolean conversion**: Use in if statements naturally
+- **Boolean conversion**: Use in if statements naturally (returns `True` if the result contains any items)
 - **Pagination support**: Built-in pagination information and `has_more` property
 
 ### Basic Usage
@@ -139,19 +140,48 @@ names = [r.get('name') for r in result]
 # Indexing and slicing
 first_record = result[0] if result else None
 first_five = result[:5]
+
+# String representation
+print(repr(result))  # SearchResult(count=10, total=42)
+```
+
+### SearchResult Constructor
+
+```python
+def __init__(
+    self,
+    data: List[T],
+    total: Optional[int] = None,
+    search_query: Optional[SearchQuery] = None,
+):
+    """
+    Initialize search result.
+
+    Args:
+        data: List of result items
+        total: Total number of matching records (defaults to len(data) if not provided)
+        search_query: The search query used to generate this result (defaults to {})
+    """
 ```
 
 ### SearchResult Properties
 
 | Property       | Type            | Description                              |
 | -------------- | --------------- | ---------------------------------------- |
-| `data`         | `List[Record]`  | The list of record results               |
+| `data`         | `List[T]`       | The list of result items (generic type)  |
 | `total`        | `int`           | Total number of matching records         |
 | `count`        | `int`           | Number of records in current result set  |
 | `limit`        | `Optional[int]` | Limit that was applied to the search     |
 | `skip`         | `int`           | Number of records that were skipped      |
 | `has_more`     | `bool`          | Whether there are more records available |
 | `search_query` | `SearchQuery`   | The search query used to generate result |
+
+> **Implementation Notes:**
+>
+> - If `search_query` is not provided during initialization, it defaults to an empty dictionary `{}`
+> - The `skip` property checks if `search_query` is a dictionary and returns the "skip" value or 0
+> - The `has_more` property is calculated as `total > (skip + len(data))`, allowing for efficient pagination
+> - The `__bool__` method returns `True` if the result contains any items (`len(data) > 0`)
 
 ### Pagination Example
 
@@ -181,6 +211,17 @@ while True:
 
     current_page += 1
 ```
+
+### RecordSearchResult Type
+
+The SDK provides a specialized type alias for search results containing Record objects:
+
+```python
+# Type alias for record search results
+RecordSearchResult = SearchResult[Record]
+```
+
+This type is what's returned by methods like `db.records.find()`, providing type safety and specialized handling for Record objects while leveraging all the functionality of the generic SearchResult class.
 
 ## Improved Record API
 
