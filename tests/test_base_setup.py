@@ -33,7 +33,7 @@ class TestBase(unittest.TestCase):
 
         # Get configuration from environment variables
         cls.token = os.getenv("RUSHDB_TOKEN")
-        cls.base_url = os.getenv("RUSHDB_URL", "http://localhost:8000")
+        cls.base_url = os.getenv("RUSHDB_URL")
 
         if not cls.token:
             raise ValueError(

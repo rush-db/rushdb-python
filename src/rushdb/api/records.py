@@ -1,8 +1,9 @@
 import typing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from ..models.record import Record
 from ..models.relationship import RelationshipDetachOptions, RelationshipOptions
+from ..models.result import RecordSearchResult
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
@@ -427,7 +428,7 @@ class RecordsAPI(BaseAPI):
         search_query: Optional[SearchQuery] = None,
         record_id: Optional[str] = None,
         transaction: Optional[Transaction] = None,
-    ) -> Tuple[List[Record], int]:
+    ) -> RecordSearchResult:
         """Search for and retrieve records matching the specified criteria.
 
         Searches the database for records that match the provided search query.
@@ -443,13 +444,11 @@ class RecordsAPI(BaseAPI):
                 If provided, the operation will be part of the transaction. Defaults to None.
 
         Returns:
-            Tuple[List[Record], int]: A tuple containing:
-                - List[Record]: List of Record objects matching the search criteria
-                - int: Total count of matching records (may be larger than returned list if pagination applies)
-
-        Note:
-            The method includes exception handling that returns an empty list if an error occurs.
-            In production code, you may want to handle specific exceptions differently.
+            RecordSearchResult: A result object containing:
+                - Iterable list of Record objects matching the search criteria
+                - Total count of matching records (may be larger than returned list if pagination applies)
+                - Additional metadata about the search operation
+                - Convenient properties like .has_more, .count, etc.
 
         Example:
             >>> from rushdb.models.search_query import SearchQuery
@@ -457,11 +456,22 @@ class RecordsAPI(BaseAPI):
             >>>
             >>> # Find all records with a specific label
             >>> query = SearchQuery(labels=["User"])
-            >>> records, total = records_api.find(query)
-            >>> print(f"Found {len(records)} records out of {total} total")
+            >>> result = records_api.find(query)
+            >>> print(f"Found {result.count} records out of {result.total} total")
+            >>>
+            >>> # Iterate over results
+            >>> for record in result:
+            ...     print(f"User: {record.get('name', 'Unknown')}")
+            >>>
+            >>> # Access specific records
+            >>> first_user = result[0] if result else None
+            >>>
+            >>> # Check if there are more results
+            >>> if result.has_more:
+            ...     print("There are more records available")
             >>>
             >>> # Find records related to a specific record
-            >>> related_records, total = records_api.find(query, record_id="parent_123")
+            >>> related_result = records_api.find(query, record_id="parent_123")
         """
 
         try:
@@ -474,11 +484,17 @@ class RecordsAPI(BaseAPI):
                 data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
                 headers=headers,
             )
-            return [
-                Record(self.client, record) for record in response.get("data")
-            ], response.get("total") or 0
+
+            records = [
+                Record(self.client, record) for record in response.get("data", [])
+            ]
+            total = response.get("total", 0)
+
+            return RecordSearchResult(
+                data=records, total=total, search_query=search_query
+            )
         except Exception:
-            return [], 0
+            return RecordSearchResult(data=[], total=0)
 
     def import_csv(
         self,

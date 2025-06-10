@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "rushdb"
-version = "1.4.0"
+version = "1.5.0"
 description = "RushDB Python SDK"
 authors = ["RushDB Team <hi@rushdb.com>"]
 license = "Apache-2.0"
 readme = "README.md"
-homepage = "https://github.com/rushdb/rushdb-python"
-repository = "https://github.com/rushdb/rushdb-python"
+homepage = "https://github.com/rush-db/rushdb-python"
+repository = "https://github.com/rush-db/rushdb-python"
 documentation = "https://docs.rushdb.com"
 packages = [{ include = "rushdb", from = "src" }]
 keywords = [
