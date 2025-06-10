@@ -10,7 +10,40 @@ class TestSearchQuery(TestBase):
         """Test basic equality search"""
         query = {"where": {"name": "John Doe"}}  # Implicit equality
         result = self.client.records.find(query)
-        print(result)
+
+        # Test that result is SearchResult
+        self.assertIsNotNone(result)
+        print(f"Search returned {len(result)} results out of {result.total} total")
+
+        # Test iteration
+        for record in result:
+            print(f"Found record: {record.get('name', 'Unknown')}")
+
+        # Test boolean check
+        if result:
+            print("Search found results")
+        else:
+            print("No results found")
+
+    def test_empty_criteria_search(self):
+        """Test basic equality search"""
+
+        result = self.client.records.find()
+
+        # Test that result is SearchResult
+        self.assertIsNotNone(result)
+        print(f"Search returned {len(result)} results out of {result.total} total")
+
+        # Test iteration
+        for record in result:
+            print(f"Found record: {record.get('name', 'Unknown')}")
+            print(f"ID: {record.id}")
+
+        # Test boolean check
+        if result:
+            print("Search found results")
+        else:
+            print("No results found")
 
     def test_basic_comparison_operators(self):
         """Test basic comparison operators"""
@@ -21,7 +54,16 @@ class TestSearchQuery(TestBase):
                 "status": {"$ne": "inactive"},
             }
         }
-        self.client.records.find(query)
+        result = self.client.records.find(query)
+
+        # Test SearchResult properties
+        print(f"Comparison search: {len(result)} results, has_more: {result.has_more}")
+
+        # Test data access for results
+        for record in result:
+            age = record.get("age")
+            if age:
+                self.assertGreater(age, 25)
 
     def test_string_operations(self):
         """Test string-specific operations"""

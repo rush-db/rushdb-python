@@ -40,13 +40,27 @@ user = db.records.create(
 )
 
 # Find records
-results = db.records.find({
+result = db.records.find({
     "where": {
         "age": {"$gte": 18},
         "name": {"$startsWith": "J"}
     },
     "limit": 10
 })
+
+# Work with SearchResult
+print(f"Found {len(result)} records out of {result.total} total")
+
+# Iterate over results
+for record in result:
+    print(f"User: {record.get('name')} (Age: {record.get('age')})")
+
+# Check if there are more results
+if result.has_more:
+    print("There are more records available")
+
+# Access specific records
+first_user = result[0] if result else None
 
 # Create relationships
 company = db.records.create(
@@ -81,6 +95,207 @@ db.records.create_many("COMPANY", {
         }]
     }]
 })
+```
+
+## SearchResult API
+
+RushDB Python SDK uses a modern `SearchResult` container that follows Python SDK best practices similar to boto3, google-cloud libraries, and other popular SDKs.
+
+### SearchResult Features
+
+- **Generic type support**: Uses Python's typing generics (`SearchResult[T]`) with `RecordSearchResult` as a type alias for `SearchResult[Record]`
+- **List-like access**: Index, slice, and iterate like a regular list
+- **Search context**: Access total count, pagination info, and the original search query
+- **Boolean conversion**: Use in if statements naturally (returns `True` if the result contains any items)
+- **Pagination support**: Built-in pagination information and `has_more` property
+
+### Basic Usage
+
+```python
+# Perform a search
+result = db.records.find({
+    "where": {"status": "active"},
+    "limit": 10,
+    "skip": 20
+})
+
+# Check if we have results
+if result:
+    print(f"Found {len(result)} records")
+
+# Access search result information
+print(f"Total matching records: {result.total}")
+print(f"Current page size: {result.count}")
+print(f"Records skipped: {result.skip}")
+print(f"Has more results: {result.has_more}")
+print(f"Search query: {result.search_query}")
+
+# Iterate over results
+for record in result:
+    print(f"Record: {record.get('name')}")
+
+# List comprehensions work
+names = [r.get('name') for r in result]
+
+# Indexing and slicing
+first_record = result[0] if result else None
+first_five = result[:5]
+
+# String representation
+print(repr(result))  # SearchResult(count=10, total=42)
+```
+
+### SearchResult Constructor
+
+```python
+def __init__(
+    self,
+    data: List[T],
+    total: Optional[int] = None,
+    search_query: Optional[SearchQuery] = None,
+):
+    """
+    Initialize search result.
+
+    Args:
+        data: List of result items
+        total: Total number of matching records (defaults to len(data) if not provided)
+        search_query: The search query used to generate this result (defaults to {})
+    """
+```
+
+### SearchResult Properties
+
+| Property       | Type            | Description                              |
+| -------------- | --------------- | ---------------------------------------- |
+| `data`         | `List[T]`       | The list of result items (generic type)  |
+| `total`        | `int`           | Total number of matching records         |
+| `count`        | `int`           | Number of records in current result set  |
+| `limit`        | `Optional[int]` | Limit that was applied to the search     |
+| `skip`         | `int`           | Number of records that were skipped      |
+| `has_more`     | `bool`          | Whether there are more records available |
+| `search_query` | `SearchQuery`   | The search query used to generate result |
+
+> **Implementation Notes:**
+>
+> - If `search_query` is not provided during initialization, it defaults to an empty dictionary `{}`
+> - The `skip` property checks if `search_query` is a dictionary and returns the "skip" value or 0
+> - The `has_more` property is calculated as `total > (skip + len(data))`, allowing for efficient pagination
+> - The `__bool__` method returns `True` if the result contains any items (`len(data) > 0`)
+
+### Pagination Example
+
+```python
+# Paginated search
+page_size = 10
+current_page = 0
+
+while True:
+    result = db.records.find({
+        "where": {"category": "electronics"},
+        "limit": page_size,
+        "skip": current_page * page_size,
+        "orderBy": {"created_at": "desc"}
+    })
+
+    if not result:
+        break
+
+    print(f"Page {current_page + 1}: {len(result)} records")
+
+    for record in result:
+        process_record(record)
+
+    if not result.has_more:
+        break
+
+    current_page += 1
+```
+
+### RecordSearchResult Type
+
+The SDK provides a specialized type alias for search results containing Record objects:
+
+```python
+# Type alias for record search results
+RecordSearchResult = SearchResult[Record]
+```
+
+This type is what's returned by methods like `db.records.find()`, providing type safety and specialized handling for Record objects while leveraging all the functionality of the generic SearchResult class.
+
+## Improved Record API
+
+The Record class has been enhanced with better data access patterns and utility methods.
+
+### Enhanced Data Access
+
+```python
+# Create a record
+user = db.records.create("User", {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "age": 30,
+    "department": "Engineering"
+})
+
+# Safe field access with defaults
+name = user.get("name")                    # "John Doe"
+phone = user.get("phone", "Not provided") # "Not provided"
+
+# Get clean user data (excludes internal fields like __id, __label)
+user_data = user.get_data()
+# Returns: {"name": "John Doe", "email": "john@example.com", "age": 30, "department": "Engineering"}
+
+# Get all data including internal fields
+full_data = user.get_data(exclude_internal=False)
+# Includes: __id, __label, __proptypes, etc.
+
+# Convenient fields property
+fields = user.fields  # Same as user.get_data()
+
+# Dictionary conversion
+user_dict = user.to_dict()  # Clean user data
+full_dict = user.to_dict(exclude_internal=False)  # All data
+
+# Direct field access
+user_name = user["name"]        # Direct access
+user_id = user["__id"]          # Internal field access
+```
+
+### Record Existence Checking
+
+```python
+# Safe existence checking (no exceptions)
+if user.exists():
+    print("Record is valid and accessible")
+    user.update({"status": "active"})
+else:
+    print("Record doesn't exist or is not accessible")
+
+# Perfect for validation workflows
+def process_record_safely(record):
+    if not record.exists():
+        return None
+    return record.get_data()
+
+# Conditional operations
+records = db.records.find({"where": {"status": "pending"}})
+for record in records:
+    if record.exists():
+        record.update({"processed_at": datetime.now()})
+```
+
+### String Representations
+
+```python
+user = db.records.create("User", {"name": "Alice Johnson"})
+
+print(repr(user))  # Record(id='abc-123', label='User')
+print(str(user))   # User: Alice Johnson
+
+# For records without names
+product = db.records.create("Product", {"sku": "ABC123"})
+print(str(product))  # Product (product-id-here)
 ```
 
 ## Complete Documentation
@@ -206,18 +421,18 @@ def find(
     search_query: Optional[SearchQuery] = None,
     record_id: Optional[str] = None,
     transaction: Optional[Transaction] = None
-) -> List[Record]
+) -> RecordSearchResult
 ```
 
 **Arguments:**
 
-- `query` (Optional[SearchQuery]): Search query parameters
+- `search_query` (Optional[SearchQuery]): Search query parameters
 - `record_id` (Optional[str]): Optional record ID to search from
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
 
-- `List[Record]`: List of matching records
+- `RecordSearchResult`: SearchResult container with matching records and metadata
 
 **Example:**
 
@@ -235,7 +450,24 @@ query = {
     "limit": 10
 }
 
-records = db.records.find(query=query)
+result = db.records.find(query=query)
+
+# Work with SearchResult
+print(f"Found {len(result)} out of {result.total} total records")
+
+# Iterate over results
+for record in result:
+    print(f"Employee: {record.get('name')} - {record.get('department')}")
+
+# Check pagination
+if result.has_more:
+    print("More results available")
+
+# Access specific records
+first_employee = result[0] if result else None
+
+# List operations
+senior_employees = [r for r in result if r.get('age', 0) > 30]
 ```
 
 ### delete()

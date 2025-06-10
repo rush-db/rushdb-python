@@ -240,7 +240,7 @@ class RushDB:
             ...     return client
         """
         try:
-            self._make_request("GET", "/")
+            self._make_request("GET", "/settings")
             return True
         except RushDBError:
             return False

@@ -22,15 +22,25 @@ class TestCreateImport(TestBase):
         record = self.client.records.create("COMPANY", data)
 
         print("\nDEBUG Record Data:")
-        print("Raw _data:", json.dumps(record.data, indent=2))
+        print("Raw data:", json.dumps(record.data, indent=2))
         print("Available keys:", list(record.data.keys()))
         print("Timestamp:", record.timestamp)
         print("Date:", record.date)
+
+        # Test new data access methods
+        print("Clean data:", record.get_data())
+        print("Name (get method):", record.get("name", "Unknown"))
+        print("Fields property:", record.fields)
 
         self.assertIsInstance(record, Record)
         self.assertEqual(record.data["__label"], "COMPANY")
         self.assertEqual(record.data["name"], "Google LLC")
         self.assertEqual(record.data["rating"], 4.9)
+
+        # Test new functionality
+        self.assertEqual(record.get("name"), "Google LLC")
+        self.assertEqual(record.get("nonexistent", "default"), "default")
+        self.assertTrue(record.exists())
 
     def test_record_methods(self):
         """Test Record class methods"""
@@ -196,6 +206,61 @@ Jane Smith,28,Product,Product Manager,110000
 Bob Wilson,35,Engineering,Tech Lead,140000"""
 
         self.client.records.import_csv("EMPLOYEE", csv_data)
+
+    def test_search_result_integration(self):
+        """Test SearchResult integration with find operations"""
+        # Create some test data
+        for i in range(5):
+            self.client.records.create(
+                "TEST_COMPANY",
+                {
+                    "name": f"Test Company {i}",
+                    "industry": "Technology" if i % 2 == 0 else "Finance",
+                    "employees": 100 + i * 50,
+                },
+            )
+
+        # Test SearchResult API
+        result = self.client.records.find(
+            {
+                "where": {"industry": "Technology"},
+                "orderBy": {"name": "asc"},
+                "limit": 10,
+            }
+        )
+
+        # Test SearchResult properties
+        print("\nSearchResult Demo:")
+        print(f"Found {len(result)} records out of {result.total} total")
+        print(f"Has more: {result.has_more}")
+        print(f"Limit: {result.limit}, Skip: {result.skip}")
+
+        # Test iteration
+        print("Technology companies:")
+        for i, company in enumerate(result, 1):
+            name = company.get("name", "Unknown")
+            employees = company.get("employees", 0)
+            print(f"  {i}. {name} ({employees} employees)")
+
+        # Test boolean conversion
+        if result:
+            print("✓ Search found results")
+
+        # Test list operations
+        company_names = [c.get("name") for c in result]
+        print(f"Company names: {company_names}")
+
+        # Test indexing if we have results
+        if len(result) > 0:
+            first_company = result[0]
+            print(f"First company: {first_company.get('name')}")
+
+        # Validate SearchResult
+        from src.rushdb.models.result import RecordSearchResult
+
+        self.assertIsInstance(result, RecordSearchResult)
+        self.assertGreaterEqual(len(result), 0)
+        self.assertIsInstance(result.total, int)
 
 
 if __name__ == "__main__":
