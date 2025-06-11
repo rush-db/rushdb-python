@@ -644,7 +644,7 @@ Imports records from CSV data.
 def import_csv(
     self,
     label: str,
-    csv_data: Union[str, bytes],
+    data: str,
     options: Optional[Dict[str, bool]] = None,
     transaction: Optional[Transaction] = None
 ) -> List[Dict[str, Any]]
@@ -653,7 +653,7 @@ def import_csv(
 **Arguments:**
 
 - `label` (str): Label for imported records
-- `csv_data` (Union[str, bytes]): CSV data to import
+- `data` (Union[str, bytes]): CSV data to import
 - `options` (Optional[Dict[str, bool]]): Import options
 - `transaction` (Optional[Transaction]): Optional transaction object
 
@@ -665,14 +665,14 @@ def import_csv(
 
 ```python
 # Import records from CSV
-csv_data = """name,age,department,role
+data = """name,age,department,role
 John Doe,30,Engineering,Senior Engineer
 Jane Smith,28,Product,Product Manager
 Bob Wilson,35,Engineering,Tech Lead"""
 
 records = db.records.import_csv(
     label="EMPLOYEE",
-    csv_data=csv_data,
+    data=data,
     options={"returnResult": True, "suggestTypes": True}
 )
 ```
