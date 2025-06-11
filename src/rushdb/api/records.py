@@ -499,7 +499,7 @@ class RecordsAPI(BaseAPI):
     def import_csv(
         self,
         label: str,
-        csv_data: Union[str, bytes],
+        data: str,
         options: Optional[Dict[str, bool]] = None,
         transaction: Optional[Transaction] = None,
     ) -> List[Dict[str, Any]]:
@@ -511,8 +511,8 @@ class RecordsAPI(BaseAPI):
 
         Args:
             label (str): The label/type to assign to all records created from the CSV.
-            csv_data (Union[str, bytes]): The CSV content to import. Can be provided
-                as a string or bytes object.
+            data (Union[str, bytes]): The CSV content to import. Can be provided
+                as a string.
             options (Optional[Dict[str, bool]], optional): Configuration options for the import operation.
                 Available options:
                 - returnResult (bool): Whether to return the created records data. Defaults to True.
@@ -541,7 +541,7 @@ class RecordsAPI(BaseAPI):
 
         payload = {
             "label": label,
-            "data": csv_data,
+            "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
 

@@ -200,12 +200,12 @@ class TestCreateImport(TestBase):
 
     def test_import_csv(self):
         """Test importing data from CSV"""
-        csv_data = """name,age,department,role,salary
+        data = """name,age,department,role,salary
 John Doe,30,Engineering,Senior Engineer,120000
 Jane Smith,28,Product,Product Manager,110000
 Bob Wilson,35,Engineering,Tech Lead,140000"""
 
-        self.client.records.import_csv("EMPLOYEE", csv_data)
+        self.client.records.import_csv("EMPLOYEE", data)
 
     def test_search_result_integration(self):
         """Test SearchResult integration with find operations"""
