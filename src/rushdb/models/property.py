@@ -18,7 +18,7 @@ class DatetimeObject(TypedDict, total=False):
 
 DatetimeValue = Union[DatetimeObject, str]
 BooleanValue = bool
-NumberValue = float
+NumberValue = Union[float, int]
 StringValue = str
 
 # Property types
