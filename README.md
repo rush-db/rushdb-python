@@ -125,10 +125,12 @@ if result:
 
 # Access search result information
 print(f"Total matching records: {result.total}")
-print(f"Current page size: {result.count}")
-print(f"Records skipped: {result.skip}")
 print(f"Has more results: {result.has_more}")
 print(f"Search query: {result.search_query}")
+
+# Get detailed pagination info
+page_info = result.get_page_info()
+print(f"Page info: {page_info}")
 
 # Iterate over results
 for record in result:
@@ -166,50 +168,57 @@ def __init__(
 
 ### SearchResult Properties
 
-| Property       | Type            | Description                              |
-| -------------- | --------------- | ---------------------------------------- |
-| `data`         | `List[T]`       | The list of result items (generic type)  |
-| `total`        | `int`           | Total number of matching records         |
-| `count`        | `int`           | Number of records in current result set  |
-| `limit`        | `Optional[int]` | Limit that was applied to the search     |
-| `skip`         | `int`           | Number of records that were skipped      |
-| `has_more`     | `bool`          | Whether there are more records available |
-| `search_query` | `SearchQuery`   | The search query used to generate result |
+| Property       | Type          | Description                              |
+| -------------- | ------------- | ---------------------------------------- |
+| `data`         | `List[T]`     | The list of result items (generic type)  |
+| `total`        | `int`         | Total number of matching records         |
+| `has_more`     | `bool`        | Whether there are more records available |
+| `search_query` | `SearchQuery` | The search query used to generate result |
+
+### SearchResult Methods
+
+| Method            | Return Type | Description                                               |
+| ----------------- | ----------- | --------------------------------------------------------- |
+| `to_dict()`       | `dict`      | Returns standardized dict with total, data, search_query  |
+| `get_page_info()` | `dict`      | Returns pagination info including total, loaded, has_more |
 
 > **Implementation Notes:**
 >
 > - If `search_query` is not provided during initialization, it defaults to an empty dictionary `{}`
-> - The `skip` property checks if `search_query` is a dictionary and returns the "skip" value or 0
-> - The `has_more` property is calculated as `total > (skip + len(data))`, allowing for efficient pagination
+> - The `has_more` property is calculated by comparing total with loaded records
 > - The `__bool__` method returns `True` if the result contains any items (`len(data) > 0`)
+> - `get_page_info()` provides detailed pagination metadata for advanced use cases
 
 ### Pagination Example
 
 ```python
-# Paginated search
-page_size = 10
-current_page = 0
+# Paginated search using skip/limit in query
+def paginate_results(query_base, page_size=10):
+    current_skip = 0
 
-while True:
-    result = db.records.find({
-        "where": {"category": "electronics"},
-        "limit": page_size,
-        "skip": current_page * page_size,
-        "orderBy": {"created_at": "desc"}
-    })
+    while True:
+        # Add pagination to query
+        query = {**query_base, "limit": page_size, "skip": current_skip}
+        result = db.records.find(query)
 
-    if not result:
-        break
+        if not result:
+            break
 
-    print(f"Page {current_page + 1}: {len(result)} records")
+        print(f"Processing {len(result)} records (skip: {current_skip})")
 
-    for record in result:
-        process_record(record)
+        for record in result:
+            process_record(record)
 
-    if not result.has_more:
-        break
+        if not result.has_more:
+            break
 
-    current_page += 1
+        current_skip += len(result)
+
+# Usage
+paginate_results({
+    "where": {"category": "electronics"},
+    "orderBy": {"created_at": "desc"}
+})
 ```
 
 ### RecordSearchResult Type
@@ -438,7 +447,7 @@ def find(
 
 ```python
 # Search for records with complex criteria
-query = {
+search_query = {
     "where": {
         "$and": [
             {"age": {"$gte": 18}},
@@ -450,7 +459,7 @@ query = {
     "limit": 10
 }
 
-result = db.records.find(query=query)
+result = db.records.find(search_query=search_query)
 
 # Work with SearchResult
 print(f"Found {len(result)} out of {result.total} total records")
@@ -479,14 +488,14 @@ Deletes records matching a query.
 ```python
 def delete(
     self,
-    query: SearchQuery,
+    search_query: SearchQuery,
     transaction: Optional[Transaction] = None
 ) -> Dict[str, str]
 ```
 
 **Arguments:**
 
-- `query` (SearchQuery): Query to match records for deletion
+- `search_query` (SearchQuery): Query to match records for deletion
 - `transaction` (Optional[Transaction]): Optional transaction object
 
 **Returns:**
@@ -497,14 +506,14 @@ def delete(
 
 ```python
 # Delete records matching criteria
-query = {
+search_query = {
     "where": {
         "status": "inactive",
         "lastActive": {"$lt": "2023-01-01"}
     }
 }
 
-response = db.records.delete(query)
+response = db.records.delete(search_query)
 ```
 
 ### delete_by_id()

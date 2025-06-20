@@ -235,6 +235,10 @@ Bob Wilson,35,Engineering,Tech Lead,140000"""
         print(f"Has more: {result.has_more}")
         print(f"Limit: {result.limit}, Skip: {result.skip}")
 
+        # Test get_page_info
+        page_info = result.get_page_info()
+        print(f"Page info: {page_info}")
+
         # Test iteration
         print("Technology companies:")
         for i, company in enumerate(result, 1):
