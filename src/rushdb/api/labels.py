@@ -1,5 +1,5 @@
 import typing
-from typing import List, Optional
+from typing import Dict, Optional
 
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
@@ -43,7 +43,7 @@ class LabelsAPI(BaseAPI):
         self,
         search_query: Optional[SearchQuery] = None,
         transaction: Optional[Transaction] = None,
-    ) -> List[str]:
+    ) -> Dict[str, int]:
         """Search for and retrieve labels matching the specified criteria.
 
         Discovers labels (record types) that exist in the database and can optionally
