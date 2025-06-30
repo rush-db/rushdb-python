@@ -1,5 +1,5 @@
 import typing
-from typing import List, Optional
+from typing import Dict, Optional
 
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
