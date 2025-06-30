@@ -43,20 +43,39 @@ For urgent issues or further assistance, you can reach out directly:
 We appreciate your contributions and look forward to your feedback!
 
 --- 
-## Poetry commands
+## Development Commands
 
-```
-poetry run isort . --check
-```
-
-```
-poetry run mypy src/rushdb
+```bash
+# Install dependencies
+uv sync --dev
 ```
 
-```
-poetry run black .
+```bash
+# Check import sorting
+uv run isort . --check
 ```
 
+```bash
+# Type checking
+uv run mypy src/rushdb
 ```
-poetry run ruff check .
+
+```bash
+# Code formatting
+uv run black .
+```
+
+```bash
+# Linting
+uv run ruff check .
+```
+
+```bash
+# Run tests
+uv run pytest
+```
+
+```bash
+# Run tests with coverage
+uv run pytest --cov
 ```

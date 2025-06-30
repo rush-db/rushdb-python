@@ -27,7 +27,7 @@ pip install rushdb
 from rushdb import RushDB
 
 # Initialize the client
-db = RushDB("YOUR_API_TOKEN")
+db = RushDB("RUSHDB_API_KEY")
 
 # Create a record
 user = db.records.create(

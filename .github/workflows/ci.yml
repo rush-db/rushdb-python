@@ -2,9 +2,9 @@ name: Python SDK CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
     types: [published]
 
@@ -23,23 +23,21 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          version: 1.7.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          version: "latest"
 
       - name: Install dependencies
         run: |
-          poetry install --no-interaction --no-root
+          uv sync --dev
 
       - name: Run linters
         run: |
-          poetry run black . --check
-          poetry run isort . --check
-          poetry run ruff check .
-          poetry run mypy src/rushdb
+          uv run black . --check
+          uv run isort . --check
+          uv run ruff check .
+          uv run mypy src/rushdb
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -54,20 +52,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          version: 1.7.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          version: "latest"
 
       - name: Install dependencies
         run: |
-          poetry install --no-interaction --no-root
+          uv sync --dev
 
       - name: Build and publish
         env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          poetry build
-          poetry publish
+          uv build
+          uv publish

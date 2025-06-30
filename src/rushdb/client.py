@@ -178,7 +178,7 @@ class RushDB:
 
         # Prepare headers
         request_headers = {
-            "token": self.api_key,
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             **(headers or {}),
         }
