@@ -1017,7 +1017,8 @@ Records can be manipulated within transactions for atomic operations:
 
 ```python
 # Start a transaction
-with db.transactions.begin() as transaction:
+transaction = db.transactions.begin()
+try:
     # Create user
     user = db.records.create(
         "USER",
@@ -1044,8 +1045,24 @@ with db.transactions.begin() as transaction:
         transaction=transaction
     )
 
-    # Transaction will automatically commit if no errors occur
-    # If an error occurs, it will automatically rollback
+    # Explicitly commit the transaction to make changes permanent
+    transaction.commit()
+except Exception as e:
+    # Rollback if any error occurs
+    transaction.rollback()
+    raise e
+
+# Alternative: Using context manager
+with db.transactions.begin() as transaction:
+    # Perform operations...
+    user = db.records.create(
+        "USER",
+        {"name": "John Doe"},
+        transaction=transaction
+    )
+
+    # Must explicitly commit - transactions are NOT automatically committed
+    transaction.commit()
 ```
 
 ---
@@ -1280,8 +1297,9 @@ property_with_value = {
 Properties API methods support optional transactions for atomic operations:
 
 ```python
-# Using a transaction
-with db.transactions.begin() as transaction:
+# Using a transaction with explicit commit
+transaction = db.transactions.begin()
+try:
     # Perform multiple property-related operations
     property_to_delete = db.properties.find(
         {"where": {"name": "temp_property"}},
@@ -1292,7 +1310,29 @@ with db.transactions.begin() as transaction:
         property_id=property_to_delete['id'],
         transaction=transaction
     )
-    # Transaction will automatically commit if no errors occur
+
+    # Explicitly commit the transaction
+    transaction.commit()
+except Exception as e:
+    # Rollback if any error occurs
+    transaction.rollback()
+    raise e
+
+# Alternative: Using context manager (auto-rollback on error)
+with db.transactions.begin() as transaction:
+    # Perform operations
+    property_to_delete = db.properties.find(
+        {"where": {"name": "temp_property"}},
+        transaction=transaction
+    )[0]
+
+    db.properties.delete(
+        property_id=property_to_delete['id'],
+        transaction=transaction
+    )
+
+    # Must explicitly commit - transactions are NOT automatically committed
+    transaction.commit()
 ```
 
 ## Error Handling
@@ -1307,3 +1347,246 @@ except RushDBError as e:
     print(f"Error: {e}")
     print(f"Error Details: {e.details}")
 ```
+
+---
+
+# LabelsAPI Documentation
+
+The `LabelsAPI` class provides methods for discovering and working with record labels in RushDB. Labels are used to categorize and type records, similar to table names in relational databases.
+
+## Class Definition
+
+```python
+class LabelsAPI(BaseAPI):
+```
+
+## Methods
+
+### find()
+
+Discovers labels (record types) that exist in the database and can optionally filter them based on search criteria.
+
+**Signature:**
+
+```python
+def find(
+    self,
+    search_query: Optional[SearchQuery] = None,
+    transaction: Optional[Transaction] = None
+) -> Dict[str, int]
+```
+
+**Arguments:**
+
+- `search_query` (Optional[SearchQuery]): Search criteria to filter labels
+- `transaction` (Optional[Transaction]): Optional transaction object
+
+**Returns:**
+
+- `Dict[str, int]`: Dictionary mapping label names to their record counts
+
+**Example:**
+
+```python
+# Get all labels in the database
+all_labels = db.labels.find()
+print("Available labels:", all_labels)
+# Output: {'USER': 150, 'DEPARTMENT': 12, 'PROJECT': 45, 'COMPANY': 3}
+
+# Search for labels amongst records matching a pattern
+from rushdb.models.search_query import SearchQuery
+query = SearchQuery(where={"name": {"$contains": "alice"}})
+user_labels = db.labels.find(query)
+print("Labels for records containing 'alice':", user_labels)
+# Output: {'USER': 2, 'EMPLOYEE': 1}
+```
+
+## Complete Usage Example
+
+```python
+# Discover all record types in the database
+all_labels = db.labels.find()
+print(f"Database contains {len(all_labels)} record types:")
+for label, count in all_labels.items():
+    print(f"  - {label}: {count} records")
+
+# Find labels for records with specific criteria
+query = SearchQuery(where={
+    "status": "active",
+    "created_date": {"$gte": "2023-01-01"}
+})
+active_labels = db.labels.find(query)
+print("Labels for active records:")
+for label, count in active_labels.items():
+    print(f"  - {label}: {count} active records")
+
+# Use with transaction
+transaction = db.transactions.begin()
+try:
+    labels_in_tx = db.labels.find(transaction=transaction)
+    # Process labels...
+    transaction.commit()
+except Exception as e:
+    transaction.rollback()
+    raise e
+```
+
+---
+
+# RelationshipsAPI Documentation
+
+The `RelationshipsAPI` class provides functionality for querying and analyzing relationships between records in RushDB. Relationships represent connections or associations between different records.
+
+## Class Definition
+
+```python
+class RelationshipsAPI(BaseAPI):
+```
+
+## Methods
+
+### find()
+
+Search for and retrieve relationships matching the specified criteria with support for pagination and transactions.
+
+**Signature:**
+
+```python
+async def find(
+    self,
+    search_query: Optional[SearchQuery] = None,
+    pagination: Optional[PaginationParams] = None,
+    transaction: Optional[Union[Transaction, str]] = None
+) -> List[Relationship]
+```
+
+**Arguments:**
+
+- `search_query` (Optional[SearchQuery]): Search criteria to filter relationships
+- `pagination` (Optional[PaginationParams]): Pagination options with `limit` and `skip`
+- `transaction` (Optional[Union[Transaction, str]]): Optional transaction object or ID
+
+**Returns:**
+
+- `List[Relationship]`: List of relationships matching the search criteria
+
+**Example:**
+
+```python
+import asyncio
+from rushdb.models.search_query import SearchQuery
+
+async def main():
+    # Find all relationships
+    all_relationships = await db.relationships.find()
+    print(f"Total relationships: {len(all_relationships)}")
+
+    # Find relationships with pagination
+    pagination = {"limit": 50, "skip": 0}
+    first_page = await db.relationships.find(pagination=pagination)
+
+    # Find specific relationship types
+    query = SearchQuery(where={"type": "BELONGS_TO"})
+    belongs_to_rels = await db.relationships.find(search_query=query)
+
+    # Find relationships involving specific records
+    user_query = SearchQuery(where={
+        "$or": [
+            {"source_id": "user-123"},
+            {"target_id": "user-123"}
+        ]
+    })
+    user_relationships = await db.relationships.find(search_query=user_query)
+
+# Run the async function
+asyncio.run(main())
+```
+
+## PaginationParams
+
+The `PaginationParams` TypedDict defines pagination options:
+
+```python
+class PaginationParams(TypedDict, total=False):
+    limit: int  # Maximum number of relationships to return
+    skip: int   # Number of relationships to skip
+```
+
+## Complete Usage Example
+
+```python
+import asyncio
+from rushdb.models.search_query import SearchQuery
+
+async def explore_relationships():
+    # Get overview of all relationships
+    all_rels = await db.relationships.find()
+    print(f"Database contains {len(all_rels)} relationships")
+
+    # Paginate through relationships
+    page_size = 25
+    page = 0
+
+    while True:
+        pagination = {"limit": page_size, "skip": page * page_size}
+        relationships = await db.relationships.find(pagination=pagination)
+
+        if not relationships:
+            break
+
+        print(f"Page {page + 1}: {len(relationships)} relationships")
+        for rel in relationships:
+            print(f"  {rel['source_id']} --[{rel['type']}]--> {rel['target_id']}")
+
+        page += 1
+        if len(relationships) < page_size:
+            break
+
+    # Find relationships by type
+    query = SearchQuery(where={"type": "WORKS_ON"})
+    work_relationships = await db.relationships.find(search_query=query)
+    print(f"Found {len(work_relationships)} 'WORKS_ON' relationships")
+
+    # Find relationships within a transaction
+    transaction = db.transactions.begin()
+    try:
+        tx_rels = await db.relationships.find(transaction=transaction)
+        # Process relationships...
+        transaction.commit()
+    except Exception as e:
+        transaction.rollback()
+        raise e
+
+# Run the example
+asyncio.run(explore_relationships())
+```
+
+## Working with Transactions
+
+Both LabelsAPI and RelationshipsAPI support transactions:
+
+```python
+import asyncio
+
+async def transaction_example():
+    transaction = db.transactions.begin()
+    try:
+        # Find labels within transaction
+        labels = db.labels.find(transaction=transaction)
+
+        # Find relationships within transaction
+        relationships = await db.relationships.find(transaction=transaction)
+
+        # Perform operations based on discovered data...
+
+        # Explicitly commit the transaction
+        transaction.commit()
+    except Exception as e:
+        # Rollback on any error
+        transaction.rollback()
+        raise e
+
+asyncio.run(transaction_example())
+```
+
+**Note:** The RelationshipsAPI methods are async and require the use of `await` and `asyncio` for proper execution.
