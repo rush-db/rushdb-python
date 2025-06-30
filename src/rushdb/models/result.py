@@ -66,7 +66,7 @@ class SearchResult(Generic[T]):
     @property
     def limit(self) -> Optional[int]:
         """Get the limit that was applied to the search."""
-        return self._search_query.get("limit") or len(self.data)
+        return self._search_query.get("limit")
 
     def __len__(self) -> int:
         """Get the number of records in this result set."""
@@ -108,7 +108,7 @@ class SearchResult(Generic[T]):
             "loaded": len(self.data),
             "has_more": self.has_more,
             "skip": self.skip,
-            "limit": self.limit or len(self.data),
+            "limit": self.limit,
         }
 
 

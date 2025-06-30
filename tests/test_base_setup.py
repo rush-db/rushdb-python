@@ -32,12 +32,12 @@ class TestBase(unittest.TestCase):
         load_env()
 
         # Get configuration from environment variables
-        cls.token = os.getenv("RUSHDB_TOKEN")
+        cls.token = os.getenv("RUSHDB_API_KEY")
         cls.base_url = os.getenv("RUSHDB_URL")
 
         if not cls.token:
             raise ValueError(
-                "RUSHDB_TOKEN environment variable is not set. "
+                "RUSHDB_API_KEY environment variable is not set. "
                 "Please create a .env file with your credentials. "
                 "You can use .env.example as a template."
             )

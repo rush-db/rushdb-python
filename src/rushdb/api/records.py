@@ -558,7 +558,7 @@ class RecordsAPI(BaseAPI):
             List[Dict[str, Any]],
             "Record",
             List["Record"],
-        ]
+        ],
     ) -> List[str]:
         """Extract record IDs from various input types and formats.
 
