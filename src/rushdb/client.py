@@ -110,7 +110,6 @@ class RushDB:
                 "customDB": settings["customDB"],
                 "managedDB": settings["managedDB"],
                 "selfHosted": settings["selfHosted"],
-                "canceled": settings["canceled"],
                 "plan_type": settings["planType"],
             }
             if settings

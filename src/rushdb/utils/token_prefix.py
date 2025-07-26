@@ -20,12 +20,11 @@ def extract_mixed_properties_from_token(
     if plan is None:
         return None, prefixed_token
 
-    b_custom, b_managed, b_self, b_canceled = tuple(bits[:4])
+    b_custom, b_managed, b_self = tuple(bits[:4])
     settings = {
         "planType": plan,
         "customDB": b_custom == "1",
         "managedDB": b_managed == "1",
         "selfHosted": b_self == "1",
-        "canceled": b_canceled == "1",
     }
     return settings, raw
