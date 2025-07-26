@@ -11,12 +11,12 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional
 
-from .utils.token_prefix import extract_mixed_properties_from_token
 from .api.labels import LabelsAPI
 from .api.properties import PropertiesAPI
 from .api.records import RecordsAPI
 from .api.transactions import TransactionsAPI
 from .common import RushDBError
+from .utils.token_prefix import extract_mixed_properties_from_token
 
 
 class RushDB:
@@ -105,13 +105,17 @@ class RushDB:
         """
         settings, raw_key = extract_mixed_properties_from_token(api_key)
 
-        self.server_settings = {
-            'customDB':    settings['customDB'],
-            'managedDB':   settings['managedDB'],
-            'selfHosted':  settings['selfHosted'],
-            'canceled':    settings['canceled'],
-            'plan_type':   settings['planType'],
-        } if settings else None
+        self.server_settings = (
+            {
+                "customDB": settings["customDB"],
+                "managedDB": settings["managedDB"],
+                "selfHosted": settings["selfHosted"],
+                "canceled": settings["canceled"],
+                "plan_type": settings["planType"],
+            }
+            if settings
+            else None
+        )
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.api_key = api_key
         self.records = RecordsAPI(self)

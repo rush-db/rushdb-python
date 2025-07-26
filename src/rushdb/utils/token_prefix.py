@@ -2,15 +2,16 @@ import re
 from typing import Dict, Optional, Tuple
 
 PlanPrefix = {
-    'initial':      'in',
-    'extended':     'ex',
-    'fullFeatured': 'ff',
+    "initial": "in",
+    "extended": "ex",
+    "fullFeatured": "ff",
 }
 
+
 def extract_mixed_properties_from_token(
-        prefixed_token: str
+    prefixed_token: str,
 ) -> Tuple[Optional[Dict[str, bool]], str]:
-    matched = re.match(r'^([a-z]{2})_([01]{4}\d*)_(.+)$', prefixed_token)
+    matched = re.match(r"^([a-z]{2})_([01]{4}\d*)_(.+)$", prefixed_token)
     if not matched:
         return None, prefixed_token
 
@@ -19,12 +20,12 @@ def extract_mixed_properties_from_token(
     if plan is None:
         return None, prefixed_token
 
-    b_custom, b_managed, b_self, b_canceled = bits[:4]
+    b_custom, b_managed, b_self, b_canceled = tuple(bits[:4])
     settings = {
-        'planType':    plan,
-        'customDB':    b_custom  == '1',
-        'managedDB':   b_managed == '1',
-        'selfHosted':  b_self    == '1',
-        'canceled':    b_canceled== '1',
+        "planType": plan,
+        "customDB": b_custom == "1",
+        "managedDB": b_managed == "1",
+        "selfHosted": b_self == "1",
+        "canceled": b_canceled == "1",
     }
     return settings, raw
