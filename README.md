@@ -73,6 +73,13 @@ user.attach(
     target=company,
     options={"type": "WORKS_AT", "direction": "out"}
 )
+
+# Run a raw Cypher query (cloud-only)
+raw = db.query.raw({
+    "query": "MATCH (u:USER) RETURN u LIMIT $limit",
+    "params": {"limit": 5}
+})
+print(raw.get("data"))
 ```
 
 ## Pushing Nested JSON
@@ -95,6 +102,21 @@ db.records.create_many("COMPANY", {
         }]
     }]
 })
+```
+
+## Importing CSV Data with Parse Config
+
+```python
+csv_data = """name,email,age\nJohn,john@example.com,30\nJane,jane@example.com,25"""
+
+response = db.records.import_csv(
+    label="USER",
+    data=csv_data,
+    options={"returnResult": True, "suggestTypes": True},
+    parse_config={"header": True, "skipEmptyLines": True, "dynamicTyping": True}
+)
+
+print(response.get("data"))
 ```
 
 ## SearchResult API

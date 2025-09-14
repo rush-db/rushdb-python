@@ -3,6 +3,8 @@
 Exposes the RushDB class.
 """
 
+from .api.query import QueryAPI
+from .api.relationships import RelationsAPI
 from .client import RushDB
 from .common import RushDBError
 from .models.property import Property
@@ -21,4 +23,6 @@ __all__ = [
     "Property",
     "RelationshipOptions",
     "RelationshipDetachOptions",
+    "QueryAPI",
+    "RelationsAPI",
 ]

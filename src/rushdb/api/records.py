@@ -501,6 +501,7 @@ class RecordsAPI(BaseAPI):
         label: str,
         data: str,
         options: Optional[Dict[str, bool]] = None,
+        parse_config: Optional[Dict[str, Any]] = None,
         transaction: Optional[Transaction] = None,
     ) -> List[Dict[str, Any]]:
         """Import records from CSV data.
@@ -511,14 +512,17 @@ class RecordsAPI(BaseAPI):
 
         Args:
             label (str): The label/type to assign to all records created from the CSV.
-            data (Union[str, bytes]): The CSV content to import. Can be provided
-                as a string.
-            options (Optional[Dict[str, bool]], optional): Configuration options for the import operation.
-                Available options:
-                - returnResult (bool): Whether to return the created records data. Defaults to True.
-                - suggestTypes (bool): Whether to automatically suggest data types for CSV columns. Defaults to True.
-            transaction (Optional[Transaction], optional): Transaction context for the operation.
-                If provided, the operation will be part of the transaction. Defaults to None.
+            data (str): The CSV content to import as a string.
+            options (Optional[Dict[str, bool]]): Import write options (see create_many for list).
+            parse_config (Optional[Dict[str, Any]]): CSV parsing configuration keys (subset of PapaParse):
+                - delimiter (str)
+                - header (bool)
+                - skipEmptyLines (bool | 'greedy')
+                - dynamicTyping (bool)
+                - quoteChar (str)
+                - escapeChar (str)
+                - newline (str)
+            transaction (Optional[Transaction]): Transaction context for the operation.
 
         Returns:
             List[Dict[str, Any]]: List of dictionaries representing the imported records,
@@ -544,6 +548,22 @@ class RecordsAPI(BaseAPI):
             "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
+        if parse_config:
+            # pass through only known parse config keys, ignore others silently
+            allowed_keys = {
+                "delimiter",
+                "header",
+                "skipEmptyLines",
+                "dynamicTyping",
+                "quoteChar",
+                "escapeChar",
+                "newline",
+            }
+            payload["parseConfig"] = {
+                k: v
+                for k, v in parse_config.items()
+                if k in allowed_keys and v is not None
+            }
 
         return self.client._make_request(
             "POST", "/records/import/csv", payload, headers
