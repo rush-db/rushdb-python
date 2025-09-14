@@ -141,3 +141,64 @@ class RelationsAPI(BaseAPI):
         )
 
         return response.data
+
+    def create_many(
+        self,
+        *,
+        source: dict,
+        target: dict,
+        type: Optional[str] = None,
+        direction: Optional[str] = None,
+        many_to_many: Optional[bool] = None,
+        transaction: Optional[Union[Transaction, str]] = None,
+    ) -> dict:
+        """Bulk create relationships by matching keys or many-to-many cartesian.
+
+        Modes:
+            1. Key-match (default): requires source.key and target.key, creates relationships where source[key] = target[key].
+            2. many_to_many=True: cartesian across filtered sets (requires where filters on both source & target and omits keys).
+
+        Args:
+            source (dict): { label: str, key?: str, where?: dict }
+            target (dict): { label: str, key?: str, where?: dict }
+            type (str, optional): Relationship type override.
+            direction (str, optional): 'in' | 'out'. Defaults to 'out' server-side when omitted.
+            many_to_many (bool, optional): Enable cartesian mode (requires filters, disallows keys).
+            transaction (Transaction|str, optional): Transaction context.
+
+        Returns:
+            dict: API response payload.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        payload: dict = {"source": source, "target": target}
+        if type:
+            payload["type"] = type
+        if direction:
+            payload["direction"] = direction
+        if many_to_many is not None:
+            payload["manyToMany"] = many_to_many
+        return self.client._make_request("POST", "/relationships/create-many", payload, headers)
+
+    def delete_many(
+        self,
+        *,
+        source: dict,
+        target: dict,
+        type: Optional[str] = None,
+        direction: Optional[str] = None,
+        many_to_many: Optional[bool] = None,
+        transaction: Optional[Union[Transaction, str]] = None,
+    ) -> dict:
+        """Bulk delete relationships using same contract as create_many.
+
+        See create_many for argument semantics.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        payload: dict = {"source": source, "target": target}
+        if type:
+            payload["type"] = type
+        if direction:
+            payload["direction"] = direction
+        if many_to_many is not None:
+            payload["manyToMany"] = many_to_many
+        return self.client._make_request("POST", "/relationships/delete-many", payload, headers)

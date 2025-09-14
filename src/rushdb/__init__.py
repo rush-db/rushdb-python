@@ -4,6 +4,8 @@ Exposes the RushDB class.
 """
 
 from .client import RushDB
+from .api.query import QueryAPI
+from .api.relationships import RelationsAPI
 from .common import RushDBError
 from .models.property import Property
 from .models.record import Record
@@ -21,4 +23,6 @@ __all__ = [
     "Property",
     "RelationshipOptions",
     "RelationshipDetachOptions",
+    "QueryAPI",
+    "RelationsAPI",
 ]
