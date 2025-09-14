@@ -1,15 +1,15 @@
-from .records import RecordsAPI
-from .properties import PropertiesAPI
 from .labels import LabelsAPI
-from .transactions import TransactionsAPI
+from .properties import PropertiesAPI
 from .query import QueryAPI
+from .records import RecordsAPI
 from .relationships import RelationsAPI
+from .transactions import TransactionsAPI
 
 __all__ = [
-	"RecordsAPI",
-	"PropertiesAPI",
-	"LabelsAPI",
-	"TransactionsAPI",
-	"QueryAPI",
-	"RelationsAPI",
+    "RecordsAPI",
+    "PropertiesAPI",
+    "LabelsAPI",
+    "TransactionsAPI",
+    "QueryAPI",
+    "RelationsAPI",
 ]

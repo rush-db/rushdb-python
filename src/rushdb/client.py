@@ -13,10 +13,10 @@ from typing import Any, Dict, Optional
 
 from .api.labels import LabelsAPI
 from .api.properties import PropertiesAPI
-from .api.records import RecordsAPI
-from .api.transactions import TransactionsAPI
 from .api.query import QueryAPI
+from .api.records import RecordsAPI
 from .api.relationships import RelationsAPI
+from .api.transactions import TransactionsAPI
 from .common import RushDBError
 from .utils.token_prefix import extract_mixed_properties_from_token
 

@@ -560,7 +560,9 @@ class RecordsAPI(BaseAPI):
                 "newline",
             }
             payload["parseConfig"] = {
-                k: v for k, v in parse_config.items() if k in allowed_keys and v is not None
+                k: v
+                for k, v in parse_config.items()
+                if k in allowed_keys and v is not None
             }
 
         return self.client._make_request(

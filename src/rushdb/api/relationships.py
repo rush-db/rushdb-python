@@ -177,7 +177,9 @@ class RelationsAPI(BaseAPI):
             payload["direction"] = direction
         if many_to_many is not None:
             payload["manyToMany"] = many_to_many
-        return self.client._make_request("POST", "/relationships/create-many", payload, headers)
+        return self.client._make_request(
+            "POST", "/relationships/create-many", payload, headers
+        )
 
     def delete_many(
         self,
@@ -201,4 +203,6 @@ class RelationsAPI(BaseAPI):
             payload["direction"] = direction
         if many_to_many is not None:
             payload["manyToMany"] = many_to_many
-        return self.client._make_request("POST", "/relationships/delete-many", payload, headers)
+        return self.client._make_request(
+            "POST", "/relationships/delete-many", payload, headers
+        )

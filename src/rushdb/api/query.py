@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-from .base import BaseAPI
 from ..models.transaction import Transaction
+from .base import BaseAPI
 
 
 class QueryAPI(BaseAPI):
@@ -38,6 +38,4 @@ class QueryAPI(BaseAPI):
             Dict[str, Any]: API response including raw driver result in 'data'.
         """
         headers = Transaction._build_transaction_header(transaction)
-        return self.client._make_request(
-            "POST", "/query/raw", body, headers
-        )
+        return self.client._make_request("POST", "/query/raw", body, headers)
