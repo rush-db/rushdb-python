@@ -155,43 +155,31 @@ class RecordsAPI(BaseAPI):
     def create_many(
         self,
         label: str,
-        data: Union[Dict[str, Any], List[Dict[str, Any]]],
-        options: Optional[Dict[str, bool]] = None,
+        data: List[Dict[str, Any]],
+        options: Optional[Dict[str, Any]] = None,
         transaction: Optional[Transaction] = None,
     ) -> List[Record]:
-        """Create multiple records in a single operation.
+        """Create multiple flat records in a single operation.
 
-        Creates multiple records with the same label but different data.
-        This is more efficient than creating records individually when
-        you need to insert many records at once.
+        This helper maps directly to the ``/records/import/json`` endpoint and is
+        intended for CSV-like flat rows (no nested objects or arrays). For nested
+        or complex JSON payloads, use :meth:`import_json` instead.
+
+        The behaviour mirrors the TypeScript SDK ``records.createMany`` method,
+        including support for upsert semantics via ``options.mergeBy`` and
+        ``options.mergeStrategy``.
 
         Args:
-            label (str): The label/type to assign to all new records.
-            data (Union[Dict[str, Any], List[Dict[str, Any]]]): The data for the records.
-                Can be a single dictionary or a list of dictionaries.
-            options (Optional[Dict[str, bool]], optional): Configuration options for the operation.
-                Available options:
-                - returnResult (bool): Whether to return the created records data. Defaults to True.
-                - suggestTypes (bool): Whether to automatically suggest data types. Defaults to True.
-            transaction (Optional[Transaction], optional): Transaction context for the operation.
-                If provided, the operation will be part of the transaction. Defaults to None.
+            label: The label/type to assign to all new records.
+            data: A list of flat dictionaries. Each dictionary represents a single
+                record. Nested objects/arrays are not supported here.
+            options: Optional write options forwarded as-is to the server
+                (e.g. ``suggestTypes``, ``mergeBy``, ``mergeStrategy``, etc.).
+            transaction: Optional transaction context for the operation.
 
         Returns:
-            List[Record]: A list of Record objects representing the newly created records.
-
-        Raises:
-            ValueError: If the label is empty or data is invalid.
-            RequestError: If the server request fails.
-
-        Example:
-            >>> records_api = RecordsAPI(client)
-            >>> users_data = [
-            ...     {"name": "John Doe", "email": "john@example.com"},
-            ...     {"name": "Jane Smith", "email": "jane@example.com"}
-            ... ]
-            >>> new_records = records_api.create_many("User", users_data)
-            >>> print(len(new_records))
-            2
+            List[Record]: A list of Record objects representing the created
+                (or upserted) records when ``options.returnResult`` is true.
         """
         headers = Transaction._build_transaction_header(transaction)
 
@@ -204,6 +192,120 @@ class RecordsAPI(BaseAPI):
             "POST", "/records/import/json", payload, headers
         )
         return [Record(self.client, record) for record in response.get("data")]
+
+    def import_json(
+        self,
+        data: Any,
+        label: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> List[Record]:
+        """Import nested or complex JSON payloads.
+
+        Works in two modes:
+
+        - With ``label`` provided: imports ``data`` under the given label.
+        - Without ``label``: expects ``data`` to be a mapping with a single
+          top-level key that determines the label, e.g. ``{"ITEM": [...]}``.
+
+        This mirrors the behaviour of the TypeScript SDK ``records.importJson``
+        method and is suitable for nested, mixed, or hash-map-like JSON
+        structures.
+
+        Args:
+            data: Arbitrary JSON-serialisable structure to import.
+            label: Optional label; if omitted, inferred from a single top-level
+                key of ``data``.
+            options: Optional import/write options (see server docs).
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            List[Record]: Imported records when ``options.returnResult`` is true.
+
+        Raises:
+            ValueError: If ``label`` is omitted and ``data`` is not an object
+                with a single top-level key.
+        """
+
+        inferred_label = label
+        payload_data: Any = data
+
+        if inferred_label is None:
+            if isinstance(data, dict):
+                keys = list(data.keys())
+                if len(keys) == 1:
+                    inferred_label = keys[0]
+                    payload_data = data[inferred_label]
+                else:
+                    raise ValueError(
+                        "records.import_json: Missing `label`. Provide `label` or "
+                        "pass an object with a single top-level key that determines "
+                        "the label, e.g. { ITEM: [...] }."
+                    )
+            else:
+                raise ValueError(
+                    "records.import_json: Missing `label`. Provide `label` or pass "
+                    "an object with a single top-level key that determines the "
+                    "label, e.g. { ITEM: [...] }."
+                )
+
+        headers = Transaction._build_transaction_header(transaction)
+        payload = {
+            "label": inferred_label,
+            "data": payload_data,
+            "options": options or {"returnResult": True, "suggestTypes": True},
+        }
+
+        response = self.client._make_request(
+            "POST", "/records/import/json", payload, headers
+        )
+        return [Record(self.client, record) for record in response.get("data")]
+
+    def upsert(
+        self,
+        data: Dict[str, Any],
+        label: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> Record:
+        """Upsert a single record.
+
+        Attempts to find an existing record matching the provided criteria and
+        either updates it or creates a new one. This mirrors the behaviour of the
+        TypeScript SDK ``records.upsert`` method.
+
+        Args:
+            data: A flat dictionary containing the record data.
+            label: Optional label/type of the record.
+            options: Optional upsert options, including ``mergeBy`` and
+                ``mergeStrategy`` as well as standard write options.
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            Record: The upserted record instance.
+        """
+
+        headers = Transaction._build_transaction_header(transaction)
+
+        # Ensure upsert semantics always receive a mergeBy array by default.
+        # This mirrors the JavaScript SDK behaviour where mergeBy defaults to []
+        # and the server interprets an empty array as "use all incoming keys".
+        normalized_options: Dict[str, Any] = {
+            "returnResult": True,
+            "suggestTypes": True,
+            "mergeBy": [],
+        }
+        if options:
+            normalized_options.update(options)
+
+        payload: Dict[str, Any] = {
+            "label": label,
+            "data": data,
+            "options": normalized_options,
+        }
+
+        response = self.client._make_request("POST", "/records", payload, headers)
+        return Record(self.client, response.get("data"))
 
     def attach(
         self,
