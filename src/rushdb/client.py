@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional
 
+from .api.ai import AIAPI
 from .api.labels import LabelsAPI
 from .api.properties import PropertiesAPI
 from .api.query import QueryAPI
@@ -19,6 +20,22 @@ from .api.relationships import RelationsAPI
 from .api.transactions import TransactionsAPI
 from .common import RushDBError
 from .utils.token_prefix import extract_mixed_properties_from_token
+
+
+class _SettingsNamespace:
+    """Project settings sub-namespace. Accessed via ``db.settings``."""
+
+    def __init__(self, client: "RushDB"):
+        self._client = client
+
+    def get(self) -> Dict[str, Any]:
+        """Retrieve the current project settings.
+
+        Returns:
+            Dict[str, Any]: Current project settings object.
+        """
+        response = self._client._make_request("GET", "/settings")
+        return response.get("data", response)
 
 
 class RushDB:
@@ -44,7 +61,8 @@ class RushDB:
         records (RecordsAPI): API interface for record operations
         properties (PropertiesAPI): API interface for property operations
         labels (LabelsAPI): API interface for label operations
-        transactions (TransactionsAPI): API interface for transaction operations
+        tx (TransactionsAPI): API interface for transaction operations
+        settings (_SettingsNamespace): API interface for project settings
 
     Example:
         >>> from rushdb import RushDB
@@ -66,7 +84,7 @@ class RushDB:
         >>> user = client.records.create("User", {"name": "John", "email": "john@example.com"})
         >>>
         >>> # Start a transaction
-        >>> transaction = client.transactions.begin()
+        >>> transaction = client.tx.begin()
         >>> try:
         ...     client.records.create("User", {"name": "Alice"}, transaction=transaction)
         ...     client.records.create("User", {"name": "Bob"}, transaction=transaction)
@@ -77,7 +95,12 @@ class RushDB:
 
     DEFAULT_BASE_URL = "https://api.rushdb.com/api/v1"
 
-    def __init__(self, api_key: str, base_url: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: Optional[str] = None,
+        url: Optional[str] = None,
+    ):
         """Initialize the RushDB client with authentication and connection settings.
 
         Sets up the client with the necessary authentication credentials and server
@@ -87,10 +110,13 @@ class RushDB:
             api_key (str): The API key for authenticating with the RushDB server.
                 This key should have appropriate permissions for the operations you
                 plan to perform.
-            base_url (Optional[str], optional): Custom base URL for the RushDB server.
-                If not provided, uses the default public RushDB API endpoint.
-                Should include the protocol (https://) and path to the API version.
-                Defaults to None, which uses DEFAULT_BASE_URL.
+            base_url (Optional[str], optional): Base URL for the RushDB server
+                (e.g. ``"https://my-rushdb.company.com/api/v1"``). Deprecated alias
+                kept for backwards compatibility — prefer ``url``.
+            url (Optional[str], optional): Base URL for a self-hosted RushDB server.
+                When provided without a ``/api/`` component the path ``/api/v1`` is
+                appended automatically.  Defaults to None, which uses
+                ``DEFAULT_BASE_URL``.
 
         Raises:
             ValueError: If api_key is empty or None.
@@ -99,10 +125,10 @@ class RushDB:
             >>> # Using default public API
             >>> client = RushDB(api_key="your_api_key")
             >>>
-            >>> # Using custom server
+            >>> # Using self-hosted server (url alias)
             >>> client = RushDB(
             ...     api_key="your_api_key",
-            ...     base_url="https://my-rushdb.company.com/api/v1"
+            ...     url="https://my-rushdb.company.com"
             ... )
         """
         settings, raw_key = extract_mixed_properties_from_token(api_key)
@@ -117,14 +143,19 @@ class RushDB:
             if settings
             else None
         )
-        self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
+        effective_url = url or base_url or self.DEFAULT_BASE_URL
+        if url and "/api/" not in effective_url:
+            effective_url = effective_url.rstrip("/") + "/api/v1"
+        self.base_url = effective_url.rstrip("/")
         self.api_key = api_key
         self.records = RecordsAPI(self)
         self.properties = PropertiesAPI(self)
         self.labels = LabelsAPI(self)
-        self.transactions = TransactionsAPI(self)
+        self.tx = TransactionsAPI(self)
         self.query = QueryAPI(self)
         self.relationships = RelationsAPI(self)
+        self.ai = AIAPI(self)
+        self.settings = _SettingsNamespace(self)
 
     def _make_request(
         self,

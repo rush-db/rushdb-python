@@ -1,7 +1,7 @@
 [project]
 name = "rushdb"
-version = "1.19.0"
-description = "RushDB Python SDK"
+version = "2.0.0"
+description = "RushDB Python SDK — memory layer for AI agents and modern apps"
 authors = [
     {name = "RushDB Team", email = "hi@rushdb.com"}
 ]
@@ -9,63 +9,43 @@ license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = [
+    "rushdb",
     "database",
     "graph database",
     "graph-database",
-    "instant database",
-    "instant-database",
-    "instant db",
-    "instant-db",
-    "neo4j",
+    "ai memory",
+    "ai-memory",
+    "agent memory",
+    "agent-memory",
+    "memory layer",
+    "memory-layer",
+    "ai agents",
+    "ai-agents",
+    "llm memory",
+    "llm-memory",
+    "mcp",
     "vector search",
     "vector-search",
-    "similarity search",
-    "ai",
-    "ai database",
-    "artificial intelligence",
-    "machine learning",
-    "machine-learning",
-    "data science",
-    "data-science",
     "rag",
     "retrieval augmented generation",
     "embedding",
     "embeddings",
+    "knowledge graph",
+    "knowledge-graph",
     "json normalization",
     "json-normalization",
     "schema-less",
     "schemaless",
     "no-schema",
-    "modern apps",
-    "modern-apps",
-    "web development",
-    "web-development",
-    "app backend",
-    "app-backend",
-    "etl",
-    "data pipeline",
-    "data-pipeline",
-    "data engineering",
-    "data-engineering",
-    "data analysis",
-    "data-analysis",
-    "data management",
-    "data-management",
-    "persistence",
-    "fractal api",
-    "fractal-api",
     "self-hosted",
     "cloud",
     "rest api",
     "rest-api",
     "graph",
-    "graphs",
     "relationships",
-    "cypher",
-    "db",
+    "persistence",
     "rush-db",
-    "rush db",
-    "rushdb"
+    "rush db"
 ]
 dependencies = [
     "python-dotenv>=1.0.0",
