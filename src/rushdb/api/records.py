@@ -90,7 +90,9 @@ class RecordsAPI(BaseAPI):
             payload["label"] = label
         if vectors is not None:
             payload["vectors"] = vectors
-        return self.client._make_request("PUT", f"/records/{record_id}", payload, headers)
+        return self.client._make_request(
+            "PUT", f"/records/{record_id}", payload, headers
+        )
 
     def update(
         self,
@@ -235,9 +237,11 @@ class RecordsAPI(BaseAPI):
         # Inject per-row vectors as $vectors so the backend BFS handles them
         if vectors:
             items = [
-                {**item, "$vectors": vectors[i]}
-                if i < len(vectors) and vectors[i]
-                else item
+                (
+                    {**item, "$vectors": vectors[i]}
+                    if i < len(vectors) and vectors[i]
+                    else item
+                )
                 for i, item in enumerate(items)
             ]
 
@@ -252,7 +256,9 @@ class RecordsAPI(BaseAPI):
             "POST", "/records/import/json", payload, headers
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
-        return RecordSearchResult(data=records, total=response.get("total", len(records)))
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records))
+        )
 
     def import_json(
         self,
@@ -322,7 +328,9 @@ class RecordsAPI(BaseAPI):
             "POST", "/records/import/json", payload, headers
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
-        return RecordSearchResult(data=records, total=response.get("total", len(records)))
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records))
+        )
 
     def upsert(
         self,
@@ -614,8 +622,12 @@ class RecordsAPI(BaseAPI):
                 "POST", "/records", {"ids": id_or_ids}, headers
             )
             records = [Record(self.client, r) for r in (response.get("data") or [])]
-            return RecordSearchResult(data=records, total=response.get("total", len(records)))
-        response = self.client._make_request("GET", f"/records/{id_or_ids}", None, headers)
+            return RecordSearchResult(
+                data=records, total=response.get("total", len(records))
+            )
+        response = self.client._make_request(
+            "GET", f"/records/{id_or_ids}", None, headers
+        )
         return Record(self.client, response.get("data", response))
 
     def find(
@@ -665,7 +677,7 @@ class RecordsAPI(BaseAPI):
         """
         query: Dict[str, Any] = dict(search_query or {})
         query["limit"] = 1
-        result = self.find(query, transaction=transaction)
+        result = self.find(typing.cast(SearchQuery, query), transaction=transaction)
         return result.data[0] if result.data else None
 
     def find_uniq(
@@ -693,7 +705,7 @@ class RecordsAPI(BaseAPI):
 
         query: Dict[str, Any] = dict(search_query or {})
         query["limit"] = 2
-        result = self.find(query, transaction=transaction)
+        result = self.find(typing.cast(SearchQuery, query), transaction=transaction)
         if result.total > 1:
             raise NonUniqueResultError(result.total)
         return result.data[0] if result.data else None
@@ -716,7 +728,7 @@ class RecordsAPI(BaseAPI):
         """
         headers = Transaction._build_transaction_header(transaction)
         response = self.client._make_request(
-            "POST", "/records/export", search_query or {}, headers
+            "POST", "/records/export", typing.cast(Dict[str, Any], search_query or {}), headers
         )
         return response
 
@@ -773,7 +785,7 @@ class RecordsAPI(BaseAPI):
         """
         headers = Transaction._build_transaction_header(transaction)
 
-        payload = {
+        payload: Dict[str, Any] = {
             "label": label,
             "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
@@ -802,7 +814,9 @@ class RecordsAPI(BaseAPI):
             "POST", "/records/import/csv", payload, headers
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
-        return RecordSearchResult(data=records, total=response.get("total", len(records)))
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records))
+        )
 
     @staticmethod
     def _extract_target_ids(

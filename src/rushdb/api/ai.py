@@ -4,7 +4,7 @@ Provides methods for graph ontology exploration, semantic vector search,
 and embedding index management.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from ..models.api_response import ApiResponse
 from ..models.transaction import Transaction
@@ -158,7 +158,9 @@ class AIAPI(BaseAPI):
         """
         headers: Dict[str, str] = {}
         if transaction is not None:
-            tx_id = transaction.id if isinstance(transaction, Transaction) else transaction
+            tx_id = (
+                transaction.id if isinstance(transaction, Transaction) else transaction
+            )
             headers["x-transaction-id"] = tx_id
 
         response = self.client._make_request(
@@ -197,7 +199,9 @@ class AIAPI(BaseAPI):
         """
         headers: Dict[str, str] = {}
         if transaction is not None:
-            tx_id = transaction.id if isinstance(transaction, Transaction) else transaction
+            tx_id = (
+                transaction.id if isinstance(transaction, Transaction) else transaction
+            )
             headers["x-transaction-id"] = tx_id
 
         response = self.client._make_request(

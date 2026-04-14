@@ -62,7 +62,9 @@ class Record:
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Set record data through API request."""
-        return self._client.records.set(self.id, data, label=label, vectors=vectors, transaction=transaction)
+        return self._client.records.set(
+            self.id, data, label=label, vectors=vectors, transaction=transaction
+        )
 
     def update(
         self, data: Dict[str, Any], transaction: Optional[Transaction] = None
