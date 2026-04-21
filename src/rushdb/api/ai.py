@@ -7,6 +7,7 @@ and embedding index management.
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from ..models.api_response import ApiResponse
+from ..models.record import Record
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
@@ -239,8 +240,11 @@ class AIAPI(BaseAPI):
             result objects (each includes the matched record and a score).
         """
         response = self.client._make_request("POST", "/ai/search", params)
+        records = [
+            Record(self.client, item) for item in response.get("data", [])
+        ]
         return ApiResponse(
-            data=response.get("data"),
+            data=records,
             success=response.get("success", True),
             total=response.get("total"),
         )

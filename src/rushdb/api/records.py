@@ -257,7 +257,7 @@ class RecordsAPI(BaseAPI):
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
         return RecordSearchResult(
-            data=records, total=response.get("total", len(records))
+            data=records, total=response.get("total", len(records)), client=self.client
         )
 
     def import_json(
@@ -329,7 +329,7 @@ class RecordsAPI(BaseAPI):
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
         return RecordSearchResult(
-            data=records, total=response.get("total", len(records))
+            data=records, total=response.get("total", len(records)), client=self.client
         )
 
     def upsert(
@@ -623,7 +623,7 @@ class RecordsAPI(BaseAPI):
             )
             records = [Record(self.client, r) for r in (response.get("data") or [])]
             return RecordSearchResult(
-                data=records, total=response.get("total", len(records))
+                data=records, total=response.get("total", len(records)), client=self.client
             )
         response = self.client._make_request(
             "GET", f"/records/{id_or_ids}", None, headers
@@ -653,10 +653,10 @@ class RecordsAPI(BaseAPI):
             total = response.get("total", 0)
 
             return RecordSearchResult(
-                data=records, total=total, search_query=search_query
+                data=records, total=total, search_query=search_query, client=self.client
             )
         except Exception:
-            return RecordSearchResult(data=[], total=0)
+            return RecordSearchResult(data=[], total=0, client=self.client)
 
     def find_one(
         self,
@@ -815,7 +815,7 @@ class RecordsAPI(BaseAPI):
         )
         records = [Record(self.client, r) for r in (response.get("data") or [])]
         return RecordSearchResult(
-            data=records, total=response.get("total", len(records))
+            data=records, total=response.get("total", len(records)), client=self.client
         )
 
     @staticmethod

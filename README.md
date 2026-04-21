@@ -6,7 +6,7 @@
 
 ### The memory layer for AI agents and apps.
 
-Push any JSON. Get graph relationships and vector search — automatically.  
+Push any JSON. Get graph relationships and vector search — automatically.
 No schema. No pipeline. No glue code.
 
 ![PyPI - Version](https://img.shields.io/pypi/v/rushdb)
@@ -160,12 +160,12 @@ if result:
     process(result[0])
 ```
 
-| Property | Type | Description |
-|---|---|---|
-| `data` | `List[Record]` | The result items |
-| `total` | `int` | Total matching records in the database |
-| `has_more` | `bool` | Whether more records exist beyond this page |
-| `search_query` | `dict` | The query that produced this result |
+| Property       | Type           | Description                                 |
+| -------------- | -------------- | ------------------------------------------- |
+| `data`         | `List[Record]` | The result items                            |
+| `total`        | `int`          | Total matching records in the database      |
+| `has_more`     | `bool`         | Whether more records exist beyond this page |
+| `search_query` | `dict`         | The query that produced this result         |
 
 ---
 
@@ -186,7 +186,7 @@ data = user.get_data()                   # {'name': 'Alice', 'email': '...'}
 full = user.get_data(exclude_internal=False)  # includes __id, __label, etc.
 
 # Existence check (no exception if record was deleted)
-if user.exists():
+if user.exists:
     user.update({'status': 'active'})
 
 # String representations
