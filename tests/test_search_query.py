@@ -250,6 +250,142 @@ class TestSearchQuery(TestBase):
         }
         self.client.records.find(query)
 
+    def test_select_self_group_single_kpi(self):
+        """Test select with self-group groupBy for a single global metric"""
+        query = {
+            "select": {"total": {"$sum": "$record.amount"}},
+            "groupBy": ["total"],
+            "orderBy": {"total": "asc"},
+        }
+        self.client.records.find(query)
+
+    def test_select_self_group_multiple_kpis(self):
+        """Test select with self-group groupBy for multiple global metrics"""
+        query = {
+            "select": {
+                "totalRevenue": {"$sum": "$record.amount"},
+                "orderCount": {"$count": "*"},
+                "avgOrder": {"$avg": "$record.amount", "$precision": 2},
+            },
+            "groupBy": ["totalRevenue", "orderCount", "avgOrder"],
+            "orderBy": {"totalRevenue": "asc"},
+        }
+        self.client.records.find(query)
+
+    def test_select_dimensional_groupby(self):
+        """Test select with dimensional groupBy (one row per distinct value)"""
+        query = {
+            "select": {
+                "count": {"$count": "*"},
+                "avg": {"$avg": "$record.score", "$precision": 2},
+            },
+            "groupBy": ["$record.status"],
+            "orderBy": {"count": "desc"},
+        }
+        self.client.records.find(query)
+
+    def test_select_per_record_with_related_label(self):
+        """Test select projecting fields from root and a related label via $alias"""
+        query = {
+            "labels": ["PROJECT"],
+            "where": {"EMPLOYEE": {"$alias": "$employee"}},
+            "select": {
+                "projectName": "$record.name",
+                "headcount": {"$count": "$employee.id"},
+                "totalWage": {"$sum": "$employee.salary"},
+                "avgSalary": {"$avg": "$employee.salary", "$precision": 0},
+            },
+            "limit": 10,
+        }
+        self.client.records.find(query)
+
+    def test_select_derived_metrics_with_ref(self):
+        """Test select using $ref to build derived (post-aggregation) metrics"""
+        query = {
+            "select": {
+                "revenue": {"$sum": "$record.amount"},
+                "cost": {"$sum": "$record.cost"},
+                "profit": {"$subtract": [{"$ref": "revenue"}, {"$ref": "cost"}]},
+                "margin": {"$divide": [{"$ref": "profit"}, {"$ref": "revenue"}]},
+            },
+            "groupBy": ["revenue", "cost", "profit", "margin"],
+            "orderBy": {"revenue": "asc"},
+        }
+        self.client.records.find(query)
+
+    def test_select_timebucket(self):
+        """Test select with $timeBucket for time-series grouping"""
+        query = {
+            "select": {
+                "month": {"$timeBucket": {"field": "$record.createdAt", "unit": "month"}},
+                "count": {"$count": "*"},
+            },
+            "groupBy": ["month"],
+            "orderBy": {"month": "asc"},
+        }
+        self.client.records.find(query)
+
+    def test_select_collect_label_based(self):
+        """Test select with label-based $collect for nested hierarchy"""
+        query = {
+            "labels": ["COMPANY"],
+            "select": {
+                "company": "$record.name",
+                "departments": {
+                    "$collect": {
+                        "label": "DEPARTMENT",
+                        "select": {
+                            "name": "$self.name",
+                            "projects": {
+                                "$collect": {
+                                    "label": "PROJECT",
+                                    "select": {
+                                        "name": "$self.name",
+                                        "employees": {
+                                            "$collect": {
+                                                "label": "EMPLOYEE",
+                                                "orderBy": {"salary": "desc"},
+                                                "limit": 3,
+                                            }
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                    }
+                },
+            },
+        }
+        self.client.records.find(query)
+
+    def test_select_collect_alias_based(self):
+        """Test select with alias-based $collect (requires $alias in where)"""
+        query = {
+            "where": {"USER": {"$alias": "$user"}},
+            "select": {
+                "users": {
+                    "$collect": {
+                        "from": "$user",
+                        "select": {"id": "$user.id", "name": "$user.name"},
+                        "orderBy": {"name": "asc"},
+                        "limit": 10,
+                    }
+                }
+            },
+        }
+        self.client.records.find(query)
+
+    def test_select_math_inside_aggregation(self):
+        """Test select with math expressions nested inside aggregation"""
+        query = {
+            "select": {
+                "total": {"$sum": {"$multiply": ["$record.price", "$record.quantity"]}}
+            },
+            "groupBy": ["total"],
+            "orderBy": {"total": "asc"},
+        }
+        self.client.records.find(query)
+
 
 if __name__ == "__main__":
     unittest.main()

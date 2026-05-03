@@ -15,5 +15,5 @@ class SearchQuery(TypedDict, total=False):
     skip: Optional[int]
     limit: Optional[int]
     orderBy: Optional[Union[Dict[str, OrderDirection], OrderDirection]]
-    aggregate: Optional[Dict[str, Any]]
+    select: Optional[Dict[str, Any]]
     groupBy: Optional[List[str]]
