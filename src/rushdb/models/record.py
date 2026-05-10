@@ -55,10 +55,16 @@ class Record:
         return datetime.fromtimestamp(self.timestamp / 1000)
 
     def set(
-        self, data: Dict[str, Any], transaction: Optional[Transaction] = None
+        self,
+        data: Dict[str, Any],
+        label: Optional[str] = None,
+        vectors: Optional[List[Dict[str, Any]]] = None,
+        transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Set record data through API request."""
-        return self._client.records.set(self.id, data, transaction)
+        return self._client.records.set(
+            self.id, data, label=label, vectors=vectors, transaction=transaction
+        )
 
     def update(
         self, data: Dict[str, Any], transaction: Optional[Transaction] = None
@@ -208,35 +214,57 @@ class Record:
         """
         return self.get_data(exclude_internal=True)
 
+    @property
+    def score(self) -> Optional[float]:
+        """Relevance score from vector/semantic search, or None if not a search result."""
+        return self.data.get("__score")
+
+    @property
     def exists(self) -> bool:
         """
-        Check if the record exists in the database.
-
-        This method safely checks if the record exists without throwing exceptions,
-        making it ideal for validation and conditional logic.
+        Check if the record has a valid ID and label.
 
         Returns:
-            bool: True if record exists and is accessible, False otherwise
+            bool: True if record has a valid __id, False otherwise
 
         Example:
             >>> record = db.records.create("User", {"name": "John"})
-            >>> record.exists()  # True
+            >>> record.exists  # True
             >>>
-            >>> # After deletion
-            >>> record.delete()
-            >>> record.exists()  # False
-            >>>
-            >>> # For invalid or incomplete records
             >>> invalid_record = Record(client, {})
-            >>> invalid_record.exists()  # False
+            >>> invalid_record.exists  # False
+        """
+        return bool(self.data.get("__id"))
+
+    def keys(self):
+        """Return record data keys (enables mapping protocol for pandas)."""
+        return self.data.keys()
+
+    def values(self):
+        """Return record data values (enables mapping protocol for pandas)."""
+        return self.data.values()
+
+    def items(self):
+        """Return record data items (enables mapping protocol for pandas)."""
+        return self.data.items()
+
+    def to_series(self, exclude_internal: bool = True):
+        """
+        Convert this record to a pandas Series.
+
+        Args:
+            exclude_internal: If True, excludes fields starting with '__'
+
+        Returns:
+            pandas.Series representation of the record
+
+        Raises:
+            ImportError: If pandas is not installed
         """
         try:
-            # Check if we have a valid ID first
-            record_id = self.data.get("__id")
-            if not record_id:
-                return False
-            return True
-
-        except Exception:
-            # Any exception means the record doesn't exist or isn't accessible
-            return False
+            import pandas as pd  # type: ignore[import-untyped]
+        except ImportError:
+            raise ImportError(
+                "pandas is required for to_series(). Install it with: pip install pandas"
+            )
+        return pd.Series(self.get_data(exclude_internal=exclude_internal))

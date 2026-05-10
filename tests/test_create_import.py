@@ -77,7 +77,7 @@ class TestCreateImport(TestBase):
     def test_create_with_transaction(self):
         """Test creating records within a transaction"""
         # Start a transaction
-        with self.client.transactions.begin() as transaction:
+        with self.client.tx.begin() as transaction:
             # Create company
             company = self.client.records.create(
                 "COMPANY", {"name": "Apple Inc", "rating": 4.8}, transaction=transaction
@@ -177,7 +177,7 @@ class TestCreateImport(TestBase):
 
     def test_transaction_rollback(self):
         """Test transaction rollback"""
-        transaction = self.client.transactions.begin()
+        transaction = self.client.tx.begin()
         try:
             # Create some records
             self.client.records.create(

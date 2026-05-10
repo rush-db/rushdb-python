@@ -19,14 +19,14 @@ class Transaction:
         """Commit the transaction."""
         if self._committed or self._rolled_back:
             raise RushDBError("Transaction already completed")
-        self.client.transactions._commit(self.id)
+        self.client.tx._commit(self.id)
         self._committed = True
 
     def rollback(self) -> None:
         """Rollback the transaction."""
         if self._committed or self._rolled_back:
             raise RushDBError("Transaction already completed")
-        self.client.transactions._rollback(self.id)
+        self.client.tx._rollback(self.id)
         self._rolled_back = True
 
     @staticmethod

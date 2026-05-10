@@ -9,6 +9,13 @@ from ..models.transaction import Transaction
 from .base import BaseAPI
 
 
+def _is_flat(obj: Any) -> bool:
+    """Return True if obj is a dict with no nested dict/list values."""
+    return isinstance(obj, dict) and not any(
+        isinstance(v, (dict, list)) for v in obj.values()
+    )
+
+
 class RecordsAPI(BaseAPI):
     """API client for managing records in RushDB.
 
@@ -50,6 +57,8 @@ class RecordsAPI(BaseAPI):
         self,
         record_id: str,
         data: Dict[str, Any],
+        label: Optional[str] = None,
+        vectors: Optional[List[Dict[str, Any]]] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Replace all data in a record with new data.
@@ -60,6 +69,11 @@ class RecordsAPI(BaseAPI):
         Args:
             record_id (str): The unique identifier of the record to update.
             data (Dict[str, Any]): The new data to replace the existing record data.
+            label (Optional[str]): Optional label to re-assign to the record.
+            vectors (Optional[List[Dict[str, Any]]]): Optional pre-computed embedding vectors
+                to write alongside the record update. Each entry must contain at least
+                ``propertyName`` and ``vector``; ``similarityFunction`` is required when
+                multiple external indexes match the same (label, propertyName).
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
 
@@ -71,7 +85,14 @@ class RecordsAPI(BaseAPI):
             RequestError: If the server request fails.
         """
         headers = Transaction._build_transaction_header(transaction)
-        return self.client._make_request("PUT", f"/records/{record_id}", data, headers)
+        payload: Dict[str, Any] = {"data": data}
+        if label is not None:
+            payload["label"] = label
+        if vectors is not None:
+            payload["vectors"] = vectors
+        return self.client._make_request(
+            "PUT", f"/records/{record_id}", payload, headers
+        )
 
     def update(
         self,
@@ -108,6 +129,7 @@ class RecordsAPI(BaseAPI):
         label: str,
         data: Dict[str, Any],
         options: Optional[Dict[str, bool]] = None,
+        vectors: Optional[List[Dict[str, Any]]] = None,
         transaction: Optional[Transaction] = None,
     ) -> Record:
         """Create a new record in the database.
@@ -123,6 +145,10 @@ class RecordsAPI(BaseAPI):
                 Available options:
                 - returnResult (bool): Whether to return the created record data. Defaults to True.
                 - suggestTypes (bool): Whether to automatically suggest data types. Defaults to True.
+            vectors (Optional[List[Dict[str, Any]]]): Optional pre-computed embedding vectors
+                to write alongside the record. Each entry must contain at least
+                ``propertyName`` and ``vector``; ``similarityFunction`` is required when
+                multiple external indexes match the same (label, propertyName).
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
 
@@ -144,11 +170,13 @@ class RecordsAPI(BaseAPI):
         """
         headers = Transaction._build_transaction_header(transaction)
 
-        payload = {
+        payload: Dict[str, Any] = {
             "label": label,
             "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
+        if vectors is not None:
+            payload["vectors"] = vectors
         response = self.client._make_request("POST", "/records", payload, headers)
         return Record(self.client, response.get("data"))
 
@@ -157,8 +185,9 @@ class RecordsAPI(BaseAPI):
         label: str,
         data: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None,
+        vectors: Optional[List[Optional[List[Dict[str, Any]]]]] = None,
         transaction: Optional[Transaction] = None,
-    ) -> List[Record]:
+    ) -> RecordSearchResult:
         """Create multiple flat records in a single operation.
 
         This helper maps directly to the ``/records/import/json`` endpoint and is
@@ -172,26 +201,64 @@ class RecordsAPI(BaseAPI):
         Args:
             label: The label/type to assign to all new records.
             data: A list of flat dictionaries. Each dictionary represents a single
-                record. Nested objects/arrays are not supported here.
+                record. Nested objects/arrays are not supported here — raises
+                ``ValueError`` if any item contains a nested object or list.
             options: Optional write options forwarded as-is to the server
                 (e.g. ``suggestTypes``, ``mergeBy``, ``mergeStrategy``, etc.).
+            vectors: Optional per-row inline vectors for external embedding indexes.
+                ``vectors[i]`` is applied to ``data[i]``. Each element is a list of
+                vector entry dicts: ``[{"propertyName": str, "vector": List[float],
+                "similarityFunction"?: str}]``. Its length must not exceed
+                ``len(data)``. Pass ``None`` in a slot to skip a row.
             transaction: Optional transaction context for the operation.
 
         Returns:
-            List[Record]: A list of Record objects representing the created
-                (or upserted) records when ``options.returnResult`` is true.
+            RecordSearchResult: Search-result wrapper containing created records
+                and total count.
+
+        Raises:
+            ValueError: If any item in ``data`` contains nested objects or arrays.
+                Use :meth:`import_json` for nested JSON.
+            ValueError: If ``vectors`` length exceeds the number of data rows.
         """
+        items = list(data)
+        if not all(_is_flat(item) for item in items):
+            raise ValueError(
+                "records.create_many supports only flat records (no nested objects/arrays). "
+                "Use records.import_json for nested JSON."
+            )
+
+        if vectors is not None and len(vectors) > len(items):
+            raise ValueError(
+                f"records.create_many: vectors length ({len(vectors)}) exceeds the "
+                f"number of data rows ({len(items)})."
+            )
+
+        # Inject per-row vectors as $vectors so the backend BFS handles them
+        if vectors:
+            items = [
+                (
+                    {**item, "$vectors": vectors[i]}
+                    if i < len(vectors) and vectors[i]
+                    else item
+                )
+                for i, item in enumerate(items)
+            ]
+
         headers = Transaction._build_transaction_header(transaction)
 
         payload = {
             "label": label,
-            "data": data,
+            "data": items,
             "options": options or {"returnResult": True, "suggestTypes": True},
         }
         response = self.client._make_request(
             "POST", "/records/import/json", payload, headers
         )
-        return [Record(self.client, record) for record in response.get("data")]
+        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records)), client=self.client
+        )
 
     def import_json(
         self,
@@ -199,7 +266,7 @@ class RecordsAPI(BaseAPI):
         label: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         transaction: Optional[Transaction] = None,
-    ) -> List[Record]:
+    ) -> RecordSearchResult:
         """Import nested or complex JSON payloads.
 
         Works in two modes:
@@ -220,7 +287,8 @@ class RecordsAPI(BaseAPI):
             transaction: Optional transaction context for the operation.
 
         Returns:
-            List[Record]: Imported records when ``options.returnResult`` is true.
+            RecordSearchResult: Imported records and total count when
+            ``options.returnResult`` is true.
 
         Raises:
             ValueError: If ``label`` is omitted and ``data`` is not an object
@@ -259,13 +327,17 @@ class RecordsAPI(BaseAPI):
         response = self.client._make_request(
             "POST", "/records/import/json", payload, headers
         )
-        return [Record(self.client, record) for record in response.get("data")]
+        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records)), client=self.client
+        )
 
     def upsert(
         self,
         data: Dict[str, Any],
         label: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        vectors: Optional[List[Dict[str, Any]]] = None,
         transaction: Optional[Transaction] = None,
     ) -> Record:
         """Upsert a single record.
@@ -303,6 +375,8 @@ class RecordsAPI(BaseAPI):
             "data": data,
             "options": normalized_options,
         }
+        if vectors is not None:
+            payload["vectors"] = vectors
 
         response = self.client._make_request("POST", "/records", payload, headers)
         return Record(self.client, response.get("data"))
@@ -525,57 +599,45 @@ class RecordsAPI(BaseAPI):
             "DELETE", f"/records/{id_or_ids}", None, headers
         )
 
+    def find_by_id(
+        self,
+        id_or_ids: Union[str, List[str]],
+        transaction: Optional[Transaction] = None,
+    ) -> Union["Record", RecordSearchResult]:
+        """Retrieve one or more records by their unique identifiers.
+
+        Mirrors the TypeScript SDK ``records.findById`` method.
+
+        Args:
+            id_or_ids: A single record ID string or a list of ID strings.
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            A single :class:`Record` when ``id_or_ids`` is a string, or a
+            :class:`RecordSearchResult` when ``id_or_ids`` is a list.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        if isinstance(id_or_ids, list):
+            response = self.client._make_request(
+                "POST", "/records", {"ids": id_or_ids}, headers
+            )
+            records = [Record(self.client, r) for r in (response.get("data") or [])]
+            return RecordSearchResult(
+                data=records,
+                total=response.get("total", len(records)),
+                client=self.client,
+            )
+        response = self.client._make_request(
+            "GET", f"/records/{id_or_ids}", None, headers
+        )
+        return Record(self.client, response.get("data", response))
+
     def find(
         self,
         search_query: Optional[SearchQuery] = None,
         record_id: Optional[str] = None,
         transaction: Optional[Transaction] = None,
     ) -> RecordSearchResult:
-        """Search for and retrieve records matching the specified criteria.
-
-        Searches the database for records that match the provided search query.
-        Can perform both general searches across all records or searches within
-        the context of a specific record's relationships.
-
-        Args:
-            search_query (Optional[SearchQuery], optional): The search criteria to filter records.
-                If None, returns all records (subject to default limits). Defaults to None.
-            record_id (Optional[str], optional): If provided, searches within the context
-                of this specific record's relationships. Defaults to None.
-            transaction (Optional[Transaction], optional): Transaction context for the operation.
-                If provided, the operation will be part of the transaction. Defaults to None.
-
-        Returns:
-            RecordSearchResult: A result object containing:
-                - Iterable list of Record objects matching the search criteria
-                - Total count of matching records (may be larger than returned list if pagination applies)
-                - Additional metadata about the search operation
-                - Convenient properties like .has_more, .count, etc.
-
-        Example:
-            >>> from rushdb.models.search_query import SearchQuery
-            >>> records_api = RecordsAPI(client)
-            >>>
-            >>> # Find all records with a specific label
-            >>> query = SearchQuery(labels=["User"])
-            >>> result = records_api.find(query)
-            >>> print(f"Found {result.count} records out of {result.total} total")
-            >>>
-            >>> # Iterate over results
-            >>> for record in result:
-            ...     print(f"User: {record.get('name', 'Unknown')}")
-            >>>
-            >>> # Access specific records
-            >>> first_user = result[0] if result else None
-            >>>
-            >>> # Check if there are more results
-            >>> if result.has_more:
-            ...     print("There are more records available")
-            >>>
-            >>> # Find records related to a specific record
-            >>> related_result = records_api.find(query, record_id="parent_123")
-        """
-
         try:
             headers = Transaction._build_transaction_header(transaction)
 
@@ -593,10 +655,87 @@ class RecordsAPI(BaseAPI):
             total = response.get("total", 0)
 
             return RecordSearchResult(
-                data=records, total=total, search_query=search_query
+                data=records, total=total, search_query=search_query, client=self.client
             )
         except Exception:
-            return RecordSearchResult(data=[], total=0)
+            return RecordSearchResult(data=[], total=0, client=self.client)
+
+    def find_one(
+        self,
+        search_query: Optional[SearchQuery] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> Optional[Record]:
+        """Return the first record matching the query, or ``None`` if no records match.
+
+        Equivalent to calling :meth:`find` with ``limit=1`` and returning the first
+        element (or ``None``). Mirrors the TypeScript SDK ``records.findOne`` method.
+
+        Args:
+            search_query: Optional search query to filter records.
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            The first matching :class:`Record`, or ``None``.
+        """
+        query: Dict[str, Any] = dict(search_query or {})
+        query["limit"] = 1
+        result = self.find(typing.cast(SearchQuery, query), transaction=transaction)
+        return result.data[0] if result.data else None
+
+    def find_uniq(
+        self,
+        search_query: Optional[SearchQuery] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> Optional[Record]:
+        """Return exactly one record matching the query, raising if more than one match.
+
+        Fetches up to 2 records. Raises :class:`~rushdb.common.NonUniqueResultError`
+        when the total result count exceeds 1. Returns ``None`` when no records match.
+        Mirrors the TypeScript SDK ``records.findUniq`` method.
+
+        Args:
+            search_query: Optional search query to filter records.
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            The single matching :class:`Record`, or ``None``.
+
+        Raises:
+            NonUniqueResultError: When more than one record matches the query.
+        """
+        from ..common import NonUniqueResultError
+
+        query: Dict[str, Any] = dict(search_query or {})
+        query["limit"] = 2
+        result = self.find(typing.cast(SearchQuery, query), transaction=transaction)
+        if result.total > 1:
+            raise NonUniqueResultError(result.total)
+        return result.data[0] if result.data else None
+
+    def export(
+        self,
+        search_query: Optional[SearchQuery] = None,
+        transaction: Optional[Transaction] = None,
+    ) -> str:
+        """Export records as CSV text.
+
+        Mirrors the TypeScript SDK ``records.export`` method.
+
+        Args:
+            search_query: Optional search query to filter which records to export.
+            transaction: Optional transaction context for the operation.
+
+        Returns:
+            A CSV string containing the exported records.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        response = self.client._make_request(
+            "POST",
+            "/records/export",
+            typing.cast(Dict[str, Any], search_query or {}),
+            headers,
+        )
+        return response
 
     def import_csv(
         self,
@@ -604,8 +743,9 @@ class RecordsAPI(BaseAPI):
         data: str,
         options: Optional[Dict[str, bool]] = None,
         parse_config: Optional[Dict[str, Any]] = None,
+        vectors: Optional[List[Optional[List[Dict[str, Any]]]]] = None,
         transaction: Optional[Transaction] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> RecordSearchResult:
         """Import records from CSV data.
 
         Parses CSV data and creates multiple records from the content. Each row
@@ -624,11 +764,16 @@ class RecordsAPI(BaseAPI):
                 - quoteChar (str)
                 - escapeChar (str)
                 - newline (str)
+            vectors: Optional per-row inline vectors for external embedding indexes.
+                ``vectors[i]`` is applied to CSV row ``i`` (0-based, after header row).
+                Each element is a list of vector entry dicts:
+                ``[{"propertyName": str, "vector": List[float], "similarityFunction"?: str}]``.
+                Its length must not exceed the number of data rows — validated server-side.
+                Pass ``None`` in a slot to skip a row.
             transaction (Optional[Transaction]): Transaction context for the operation.
 
         Returns:
-            List[Dict[str, Any]]: List of dictionaries representing the imported records,
-                or server response data depending on the options.
+            RecordSearchResult: Imported records and total count.
 
         Raises:
             ValueError: If the label is empty or CSV data is invalid/malformed.
@@ -641,11 +786,11 @@ class RecordsAPI(BaseAPI):
             ... Jane Smith,jane@example.com,25'''
             >>>
             >>> imported_records = records_api.import_csv("User", csv_content)
-            >>> print(f"Imported {len(imported_records)} records")
+            >>> print(f"Imported {len(imported_records.data)} records")
         """
         headers = Transaction._build_transaction_header(transaction)
 
-        payload = {
+        payload: Dict[str, Any] = {
             "label": label,
             "data": data,
             "options": options or {"returnResult": True, "suggestTypes": True},
@@ -667,8 +812,15 @@ class RecordsAPI(BaseAPI):
                 if k in allowed_keys and v is not None
             }
 
-        return self.client._make_request(
+        if vectors is not None:
+            payload["vectors"] = vectors
+
+        response = self.client._make_request(
             "POST", "/records/import/csv", payload, headers
+        )
+        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        return RecordSearchResult(
+            data=records, total=response.get("total", len(records)), client=self.client
         )
 
     @staticmethod
@@ -722,7 +874,17 @@ class RecordsAPI(BaseAPI):
         if isinstance(target, str):
             return [target]
         elif isinstance(target, list):
-            return [t.get("__id", "") if isinstance(t, dict) else "" for t in target]
+            ids = []
+            for t in target:
+                if isinstance(t, str):
+                    ids.append(t)
+                elif isinstance(t, Record) and "__id" in t.data:
+                    ids.append(t.data["__id"])
+                elif isinstance(t, dict) and "__id" in t:
+                    ids.append(t["__id"])
+                else:
+                    raise ValueError(f"Cannot extract id from list item: {t!r}")
+            return ids
         elif isinstance(target, Record) and "__id" in target.data:
             return [target.data["__id"]]
         elif isinstance(target, dict) and "__id" in target:

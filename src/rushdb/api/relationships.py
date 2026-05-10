@@ -60,7 +60,7 @@ class RelationsAPI(BaseAPI):
         >>> page_1 = await relations_api.find(pagination=pagination)
     """
 
-    async def find(
+    def find(
         self,
         search_query: Optional[SearchQuery] = None,
         pagination: Optional[PaginationParams] = None,
@@ -68,54 +68,22 @@ class RelationsAPI(BaseAPI):
     ) -> List[Relationship]:
         """Search for and retrieve relationships matching the specified criteria.
 
-        Asynchronously searches the database for relationships that match the provided
-        search query. Supports pagination for efficient handling of large result sets
-        and can operate within transaction contexts.
-
         Args:
-            search_query (Optional[SearchQuery], optional): The search criteria to filter relationships.
-                If None, returns all relationships (subject to pagination limits). Can include
-                filters for relationship types, source/target records, or other metadata.
-                Defaults to None.
-            pagination (Optional[PaginationParams], optional): Pagination options to control
-                result set size and offset. Contains:
-                - limit (int): Maximum number of relationships to return
-                - skip (int): Number of relationships to skip from the beginning
-                Defaults to None.
-            transaction (Optional[Union[Transaction, str]], optional): Transaction context
-                for the operation. Can be either a Transaction object or a transaction ID string.
-                If provided, the operation will be part of the transaction. Defaults to None.
+            search_query: The search criteria to filter relationships.
+                If None, returns all relationships (subject to pagination limits).
+            pagination: Pagination options (``limit`` and ``skip``).
+            transaction: Optional transaction context.
 
         Returns:
-            List[Relationship]: List of Relationship objects matching the search criteria.
-                The list will be limited by pagination parameters if provided.
+            List[Relationship]: Relationships matching the search criteria.
 
         Raises:
-            RequestError: If the server request fails.
-
-        Note:
-            This is an async method and must be awaited when called.
+            RushDBError: If the server request fails.
 
         Example:
-            >>> from rushdb.models.search_query import SearchQuery
             >>> relations_api = RelationsAPI(client)
-            >>>
-            >>> # Find all relationships
-            >>> all_relationships = await relations_api.find()
-            >>>
-            >>> # Find relationships with pagination
-            >>> pagination = PaginationParams(limit=50, skip=0)
-            >>> first_page = await relations_api.find(pagination=pagination)
-            >>>
-            >>> # Find relationships with search criteria
-            >>> query = SearchQuery(where={"flight_type": "domestic"})
-            >>> follow_relationships = await relations_api.find(search_query=query)
-            >>>
-            >>> # Combine search and pagination
-            >>> filtered_page = await relations_api.find(
-            ...     search_query=query,
-            ...     pagination=PaginationParams(limit=25, skip=25)
-            ... )
+            >>> all_rels = relations_api.find()
+            >>> page = relations_api.find(pagination={"limit": 50, "skip": 0})
         """
         # Build query string for pagination
         query_params = {}
@@ -140,7 +108,7 @@ class RelationsAPI(BaseAPI):
             headers=headers,
         )
 
-        return response.data
+        return response.get("data", [])
 
     def create_many(
         self,

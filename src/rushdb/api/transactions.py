@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from ..models.transaction import Transaction
 from .base import BaseAPI
@@ -27,7 +27,7 @@ class TransactionsAPI(BaseAPI):
     Example:
         >>> from rushdb import RushDB
         >>> client = RushDB(api_key="your_api_key")
-        >>> tx_api = client.transactions
+        >>> tx_api = client.tx
         >>>
         >>> # Begin a new transaction
         >>> transaction = tx_api.begin(ttl=10000)  # 10 second TTL
@@ -126,3 +126,48 @@ class TransactionsAPI(BaseAPI):
             This is an internal method. Use transaction.rollback() instead of calling this directly.
         """
         return self.client._make_request("POST", f"/tx/{transaction_id}/rollback", {})
+
+    def get(self, transaction: Union[str, "Transaction"]) -> "Transaction":
+        """Retrieve an existing transaction by ID.
+
+        Useful when the original ``Transaction`` object is unavailable (e.g.
+        recovered from storage or passed across a process boundary).
+
+        Args:
+            transaction: A :class:`Transaction` object or a raw transaction ID
+                string.
+
+        Returns:
+            Transaction: A ``Transaction`` object wrapping the retrieved ID.
+        """
+        tx_id = transaction.id if isinstance(transaction, Transaction) else transaction
+        response = self.client._make_request("GET", f"/tx/{tx_id}")
+        return Transaction(self.client, response.get("data", {}).get("id", tx_id))
+
+    def commit(self, transaction: Union[str, "Transaction"]) -> None:
+        """Commit a transaction by object or ID.
+
+        A public convenience wrapper so callers can do
+        ``db.tx.commit(tx)`` in addition to ``tx.commit()``,
+        matching the JS SDK ``db.tx.commit(tx)`` pattern.
+
+        Args:
+            transaction: A :class:`Transaction` object or a raw transaction ID
+                string.
+        """
+        tx_id = transaction.id if isinstance(transaction, Transaction) else transaction
+        self._commit(tx_id)
+
+    def rollback(self, transaction: Union[str, "Transaction"]) -> None:
+        """Roll back a transaction by object or ID.
+
+        A public convenience wrapper so callers can do
+        ``db.tx.rollback(tx)`` in addition to ``tx.rollback()``,
+        matching the JS SDK ``db.tx.rollback(tx)`` pattern.
+
+        Args:
+            transaction: A :class:`Transaction` object or a raw transaction ID
+                string.
+        """
+        tx_id = transaction.id if isinstance(transaction, Transaction) else transaction
+        self._rollback(tx_id)

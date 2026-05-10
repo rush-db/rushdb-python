@@ -32,6 +32,7 @@ class Property(TypedDict):
     name: str
     type: PropertyType
     metadata: Optional[str]
+    recordsCount: Optional[int]
 
 
 class PropertyWithValue(Property):
