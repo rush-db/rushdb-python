@@ -221,7 +221,7 @@ class RecordsAPI(BaseAPI):
                 Use :meth:`import_json` for nested JSON.
             ValueError: If ``vectors`` length exceeds the number of data rows.
         """
-        items = data if isinstance(data, list) else [data]
+        items = list(data)
         if not all(_is_flat(item) for item in items):
             raise ValueError(
                 "records.create_many supports only flat records (no nested objects/arrays). "
