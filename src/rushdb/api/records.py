@@ -623,7 +623,9 @@ class RecordsAPI(BaseAPI):
             )
             records = [Record(self.client, r) for r in (response.get("data") or [])]
             return RecordSearchResult(
-                data=records, total=response.get("total", len(records)), client=self.client
+                data=records,
+                total=response.get("total", len(records)),
+                client=self.client,
             )
         response = self.client._make_request(
             "GET", f"/records/{id_or_ids}", None, headers
@@ -728,7 +730,10 @@ class RecordsAPI(BaseAPI):
         """
         headers = Transaction._build_transaction_header(transaction)
         response = self.client._make_request(
-            "POST", "/records/export", typing.cast(Dict[str, Any], search_query or {}), headers
+            "POST",
+            "/records/export",
+            typing.cast(Dict[str, Any], search_query or {}),
+            headers,
         )
         return response
 

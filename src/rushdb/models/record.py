@@ -262,7 +262,7 @@ class Record:
             ImportError: If pandas is not installed
         """
         try:
-            import pandas as pd
+            import pandas as pd  # type: ignore[import-untyped]
         except ImportError:
             raise ImportError(
                 "pandas is required for to_series(). Install it with: pip install pandas"

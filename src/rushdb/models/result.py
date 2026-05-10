@@ -1,4 +1,3 @@
-import csv
 import io
 from typing import TYPE_CHECKING, Any, Dict, Generic, Iterator, List, Optional, TypeVar
 
@@ -191,7 +190,8 @@ class SearchResult(Generic[T]):
         _EXCLUDE = {"__id", "__label", "__proptypes"}
         first = self._data[0]
         headers = [
-            k for k in first.data.keys()  # type: ignore[attr-defined]
+            k
+            for k in first.data.keys()  # type: ignore[attr-defined]
             if k not in _EXCLUDE
         ]
 
@@ -208,9 +208,7 @@ class SearchResult(Generic[T]):
             output.write(",".join(row) + "\n")
         return output.getvalue()
 
-    def set_properties(
-        self, patch: Dict[str, Any], transaction=None
-    ) -> None:
+    def set_properties(self, patch: Dict[str, Any], transaction=None) -> None:
         """Update properties across all records in this result set.
 
         Records are updated in batches of 100, mirroring the JavaScript SDK's
@@ -239,7 +237,7 @@ class SearchResult(Generic[T]):
             ImportError: If pandas is not installed
         """
         try:
-            import pandas as pd
+            import pandas as pd  # type: ignore[import-untyped]
         except ImportError:
             raise ImportError(
                 "pandas is required for to_dataframe(). Install it with: pip install pandas"

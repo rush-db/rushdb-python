@@ -3,6 +3,8 @@
 import unittest
 from unittest.mock import Mock
 
+import pytest
+
 from src.rushdb.models.record import Record
 from src.rushdb.models.result import RecordSearchResult, SearchResult
 
@@ -337,23 +339,32 @@ class TestRecordScoreProperty(unittest.TestCase):
 
     def test_score_absent(self):
         """score is None when __score not in data."""
-        record = Record(self.mock_client, {"__id": "1", "__label": "User", "name": "John"})
+        record = Record(
+            self.mock_client, {"__id": "1", "__label": "User", "name": "John"}
+        )
         self.assertIsNone(record.score)
 
     def test_score_present(self):
         """score returns float when __score is in data."""
-        record = Record(self.mock_client, {"__id": "1", "__label": "User", "__score": 0.95})
+        record = Record(
+            self.mock_client, {"__id": "1", "__label": "User", "__score": 0.95}
+        )
         self.assertEqual(record.score, 0.95)
 
     def test_score_excluded_from_fields(self):
         """__score is not included in record.fields."""
-        record = Record(self.mock_client, {"__id": "1", "__label": "User", "__score": 0.8, "name": "X"})
+        record = Record(
+            self.mock_client,
+            {"__id": "1", "__label": "User", "__score": 0.8, "name": "X"},
+        )
         self.assertNotIn("__score", record.fields)
         self.assertNotIn("__score", record.get_data(exclude_internal=True))
 
     def test_score_included_in_full_data(self):
         """__score is included when exclude_internal=False."""
-        record = Record(self.mock_client, {"__id": "1", "__label": "User", "__score": 0.8})
+        record = Record(
+            self.mock_client, {"__id": "1", "__label": "User", "__score": 0.8}
+        )
         self.assertIn("__score", record.get_data(exclude_internal=False))
 
 
@@ -410,7 +421,15 @@ class TestSearchResultNewMethods(unittest.TestCase):
     def setUp(self):
         self.mock_client = Mock()
         self.records = [
-            Record(self.mock_client, {"__id": f"{i}", "__label": "Item", "name": f"Item {i}", "price": i * 10})
+            Record(
+                self.mock_client,
+                {
+                    "__id": f"{i}",
+                    "__label": "Item",
+                    "name": f"Item {i}",
+                    "price": i * 10,
+                },
+            )
             for i in range(1, 4)
         ]
         self.result = RecordSearchResult(
@@ -441,9 +460,14 @@ class TestSearchResultNewMethods(unittest.TestCase):
 
     def test_next_returns_new_result(self):
         next_records = [
-            Record(self.mock_client, {"__id": "4", "__label": "Item", "name": "Item 4", "price": 40})
+            Record(
+                self.mock_client,
+                {"__id": "4", "__label": "Item", "name": "Item 4", "price": 40},
+            )
         ]
-        next_result = RecordSearchResult(data=next_records, total=10, search_query={"limit": 3, "skip": 3})
+        next_result = RecordSearchResult(
+            data=next_records, total=10, search_query={"limit": 3, "skip": 3}
+        )
         self.mock_client.records.find.return_value = next_result
 
         result = self.result.next()
@@ -454,9 +478,14 @@ class TestSearchResultNewMethods(unittest.TestCase):
 
     def test_next_preserve_data(self):
         next_records = [
-            Record(self.mock_client, {"__id": "4", "__label": "Item", "name": "Item 4", "price": 40})
+            Record(
+                self.mock_client,
+                {"__id": "4", "__label": "Item", "name": "Item 4", "price": 40},
+            )
         ]
-        next_result = RecordSearchResult(data=next_records, total=10, search_query={"limit": 3, "skip": 3})
+        next_result = RecordSearchResult(
+            data=next_records, total=10, search_query={"limit": 3, "skip": 3}
+        )
         self.mock_client.records.find.return_value = next_result
 
         result = self.result.next(preserve_data=True)
@@ -492,12 +521,17 @@ class TestPandasIntegration(unittest.TestCase):
     """Pandas integration tests — skipped if pandas not installed."""
 
     def setUp(self):
-        self.pd = pytest.importorskip("pandas") if _has_pytest() else _try_import_pandas()
+        self.pd = (
+            pytest.importorskip("pandas") if _has_pytest() else _try_import_pandas()
+        )
         if self.pd is None:
             self.skipTest("pandas not installed")
         self.mock_client = Mock()
         self.records = [
-            Record(self.mock_client, {"__id": f"{i}", "__label": "User", "name": f"User {i}", "age": 20 + i})
+            Record(
+                self.mock_client,
+                {"__id": f"{i}", "__label": "User", "name": f"User {i}", "age": 20 + i},
+            )
             for i in range(3)
         ]
         self.result = RecordSearchResult(data=self.records, total=3)
@@ -523,6 +557,7 @@ class TestPandasIntegration(unittest.TestCase):
     def test_dataframe_from_records_list(self):
         """pd.DataFrame([r1, r2, r3]) works via mapping protocol."""
         import pandas as pd
+
         df = pd.DataFrame([dict(r.items()) for r in self.records])
         self.assertIn("__id", df.columns)
         self.assertEqual(len(df), 3)
@@ -531,6 +566,7 @@ class TestPandasIntegration(unittest.TestCase):
 def _has_pytest():
     try:
         import pytest  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -539,6 +575,7 @@ def _has_pytest():
 def _try_import_pandas():
     try:
         import pandas as pd
+
         return pd
     except ImportError:
         return None

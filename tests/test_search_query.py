@@ -317,7 +317,9 @@ class TestSearchQuery(TestBase):
         """Test select with $timeBucket for time-series grouping"""
         query = {
             "select": {
-                "month": {"$timeBucket": {"field": "$record.createdAt", "unit": "month"}},
+                "month": {
+                    "$timeBucket": {"field": "$record.createdAt", "unit": "month"}
+                },
                 "count": {"$count": "*"},
             },
             "groupBy": ["month"],

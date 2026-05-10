@@ -240,9 +240,7 @@ class AIAPI(BaseAPI):
             result objects (each includes the matched record and a score).
         """
         response = self.client._make_request("POST", "/ai/search", params)
-        records = [
-            Record(self.client, item) for item in response.get("data", [])
-        ]
+        records = [Record(self.client, item) for item in response.get("data", [])]
         return ApiResponse(
             data=records,
             success=response.get("success", True),
