@@ -34,7 +34,7 @@ class _SettingsNamespace:
         Returns:
             Dict[str, Any]: Current project settings object.
         """
-        response = self._client._make_request("GET", "/settings")
+        response = self._client._make_request("GET", "/sdk/settings")
         return response.get("data", response)
 
 
@@ -288,7 +288,7 @@ class RushDB:
             ...     return client
         """
         try:
-            self._make_request("GET", "/settings")
+            self._make_request("GET", "/sdk/settings")
             return True
         except RushDBError:
             return False

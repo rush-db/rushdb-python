@@ -7,6 +7,17 @@ from .transaction import Transaction
 if TYPE_CHECKING:
     from ..client import RushDB
 
+# RecordTarget mirrors the JS SDK's DBRecordTarget type:
+# a record can be identified by a UUID string, a dict containing "__id", or a Record instance.
+RecordTarget = Union[str, Dict[str, Any], "Record"]
+
+# RelationTarget mirrors the JS SDK's RelationTarget type:
+# one or more records used as the target in attach/detach operations.
+RelationTarget = Union[
+    "RecordTarget",
+    List["RecordTarget"],
+]
+
 
 class Record:
     """Represents a record in RushDB with methods for manipulation."""
@@ -74,14 +85,7 @@ class Record:
 
     def attach(
         self,
-        target: Union[
-            str,
-            List[str],
-            Dict[str, Any],
-            List[Dict[str, Any]],
-            "Record",
-            List["Record"],
-        ],
+        target: "RelationTarget",
         options: Optional[RelationshipOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
@@ -90,14 +94,7 @@ class Record:
 
     def detach(
         self,
-        target: Union[
-            str,
-            List[str],
-            Dict[str, Any],
-            List[Dict[str, Any]],
-            "Record",
-            List["Record"],
-        ],
+        target: "RelationTarget",
         options: Optional[RelationshipDetachOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
