@@ -1,11 +1,15 @@
 import typing
-from typing import List, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, List, Optional, TypedDict, Union
 from urllib.parse import urlencode
 
 from ..models.relationship import Relationship
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
+from .relationship_patterns import RelationshipPatternsAPI
+
+if TYPE_CHECKING:
+    from ..client import RushDB
 
 
 class PaginationParams(TypedDict, total=False):
@@ -59,6 +63,10 @@ class RelationsAPI(BaseAPI):
         >>> pagination = {"limit": 50, "skip": 0}
         >>> page_1 = await relations_api.find(pagination=pagination)
     """
+
+    def __init__(self, client: "RushDB"):
+        super().__init__(client)
+        self.patterns = RelationshipPatternsAPI(client)
 
     def find(
         self,

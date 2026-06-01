@@ -1,12 +1,35 @@
 import typing
 from typing import Any, Dict, List, Optional, Union
 
-from ..models.record import Record
+from ..models.record import Record, RecordTarget, RelationTarget
 from ..models.relationship import RelationshipDetachOptions, RelationshipOptions
 from ..models.result import RecordSearchResult
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
+
+
+def pick_record_id(target: RecordTarget) -> Optional[str]:
+    """Extract a record ID string from any RecordTarget representation.
+
+    Mirrors the JavaScript SDK's ``pickRecordId`` utility in ``src/api/utils.ts``.
+    Accepts a UUID string, a ``Record`` instance, or a plain dict containing
+    an ``__id`` field — in all cases the resolved UUID string is returned.
+
+    Args:
+        target: A record reference as a string ID, ``Record`` object, or dict
+            with an ``"__id"`` key.
+
+    Returns:
+        The UUID string, or ``None`` if it cannot be resolved.
+    """
+    if isinstance(target, str):
+        return target
+    elif isinstance(target, Record):
+        return target.data.get("__id")
+    elif isinstance(target, dict):
+        return target.get("__id")
+    return None
 
 
 def _is_flat(obj: Any) -> bool:
@@ -55,7 +78,7 @@ class RecordsAPI(BaseAPI):
 
     def set(
         self,
-        record_id: str,
+        target: RecordTarget,
         data: Dict[str, Any],
         label: Optional[str] = None,
         vectors: Optional[List[Dict[str, Any]]] = None,
@@ -67,7 +90,8 @@ class RecordsAPI(BaseAPI):
         removing any existing fields that are not present in the new data.
 
         Args:
-            record_id (str): The unique identifier of the record to update.
+            target (RecordTarget): The record to update. Accepts a UUID string,
+                a ``Record`` instance, or a dict containing an ``"__id"`` field.
             data (Dict[str, Any]): The new data to replace the existing record data.
             label (Optional[str]): Optional label to re-assign to the record.
             vectors (Optional[List[Dict[str, Any]]]): Optional pre-computed embedding vectors
@@ -81,9 +105,10 @@ class RecordsAPI(BaseAPI):
             Dict[str, str]: Response from the server containing operation status.
 
         Raises:
-            ValueError: If the record_id is invalid or empty.
+            ValueError: If the target cannot be resolved to a valid record ID.
             RequestError: If the server request fails.
         """
+        record_id = pick_record_id(target)
         headers = Transaction._build_transaction_header(transaction)
         payload: Dict[str, Any] = {"data": data}
         if label is not None:
@@ -96,7 +121,7 @@ class RecordsAPI(BaseAPI):
 
     def update(
         self,
-        record_id: str,
+        target: RecordTarget,
         data: Dict[str, Any],
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
@@ -106,7 +131,8 @@ class RecordsAPI(BaseAPI):
         with existing record data without removing existing fields.
 
         Args:
-            record_id (str): The unique identifier of the record to update.
+            target (RecordTarget): The record to update. Accepts a UUID string,
+                a ``Record`` instance, or a dict containing an ``"__id"`` field.
             data (Dict[str, Any]): The data to merge with the existing record data.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
@@ -115,9 +141,10 @@ class RecordsAPI(BaseAPI):
             Dict[str, str]: Response from the server containing operation status.
 
         Raises:
-            ValueError: If the record_id is invalid or empty.
+            ValueError: If the target cannot be resolved to a valid record ID.
             RequestError: If the server request fails.
         """
+        record_id = pick_record_id(target)
         headers = Transaction._build_transaction_header(transaction)
 
         return self.client._make_request(
@@ -383,15 +410,8 @@ class RecordsAPI(BaseAPI):
 
     def attach(
         self,
-        source: Union[str, Dict[str, Any]],
-        target: Union[
-            str,
-            List[str],
-            Dict[str, Any],
-            List[Dict[str, Any]],
-            "Record",
-            List["Record"],
-        ],
+        source: RecordTarget,
+        target: RelationTarget,
         options: Optional[RelationshipOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
@@ -402,16 +422,11 @@ class RecordsAPI(BaseAPI):
         record dictionaries, or Record objects.
 
         Args:
-            source (Union[str, Dict[str, Any]]): The source record to attach targets to.
-                Can be a record ID string or a record dictionary containing '__id'.
-            target (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]):
-                The target record(s) to attach to the source. Accepts multiple formats:
-                - Single record ID (str)
-                - List of record IDs (List[str])
-                - Record dictionary with '__id' field
-                - List of record dictionaries
-                - Record object
-                - List of Record objects
+            source (RecordTarget): The source record to attach targets to.
+                Accepts a UUID string, a ``Record`` instance, or a dict with ``"__id"``.
+            target (RelationTarget): The target record(s) to attach to the source.
+                Accepts a single or list of: UUID string, ``Record`` instance, or
+                dict with ``"__id"``.
             options (Optional[RelationshipOptions], optional): Additional options for the relationship.
                 Defaults to None.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
@@ -445,15 +460,8 @@ class RecordsAPI(BaseAPI):
 
     def detach(
         self,
-        source: Union[str, Dict[str, Any]],
-        target: Union[
-            str,
-            List[str],
-            Dict[str, Any],
-            List[Dict[str, Any]],
-            "Record",
-            List["Record"],
-        ],
+        source: RecordTarget,
+        target: RelationTarget,
         options: Optional[RelationshipDetachOptions] = None,
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
@@ -464,16 +472,11 @@ class RecordsAPI(BaseAPI):
         record dictionaries, or Record objects.
 
         Args:
-            source (Union[str, Dict[str, Any]]): The source record to detach targets from.
-                Can be a record ID string or a record dictionary containing '__id'.
-            target (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]):
-                The target record(s) to detach from the source. Accepts multiple formats:
-                - Single record ID (str)
-                - List of record IDs (List[str])
-                - Record dictionary with '__id' field
-                - List of record dictionaries
-                - Record object
-                - List of Record objects
+            source (RecordTarget): The source record to detach targets from.
+                Accepts a UUID string, a ``Record`` instance, or a dict with ``"__id"``.
+            target (RelationTarget): The target record(s) to detach from the source.
+                Accepts a single or list of: UUID string, ``Record`` instance, or
+                dict with ``"__id"``.
             options (Optional[RelationshipDetachOptions], optional): Additional options for the detach operation.
                 Defaults to None.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
@@ -550,7 +553,7 @@ class RecordsAPI(BaseAPI):
 
     def delete_by_id(
         self,
-        id_or_ids: Union[str, List[str]],
+        target: Union[RecordTarget, List[RecordTarget]],
         transaction: Optional[Transaction] = None,
     ) -> Dict[str, str]:
         """Delete one or more records by their unique identifiers.
@@ -559,8 +562,9 @@ class RecordsAPI(BaseAPI):
         deletion and bulk deletion of multiple records.
 
         Args:
-            id_or_ids (Union[str, List[str]]): The record identifier(s) to delete.
-                Can be a single record ID string or a list of record ID strings.
+            target (Union[RecordTarget, List[RecordTarget]]): The record(s) to delete.
+                Accepts a UUID string, a ``Record`` instance, a dict containing
+                ``"__id"``, or a list of any of those forms.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
 
@@ -569,39 +573,42 @@ class RecordsAPI(BaseAPI):
                 information about the deletion operation.
 
         Raises:
-            ValueError: If any of the provided IDs are invalid or empty.
+            ValueError: If any target cannot be resolved to a valid record ID.
             RequestError: If the server request fails.
 
         Note:
-            When deleting multiple records (list of IDs), the operation uses a
+            When deleting multiple records (list), the operation uses a
             batch delete with a limit of 1000 records. For single record deletion,
             it uses a direct DELETE request.
 
         Example:
             >>> records_api = RecordsAPI(client)
-            >>> # Delete a single record
+            >>> # Delete a single record — string, Record object, or dict all work
             >>> response = records_api.delete_by_id("record_123")
+            >>> response = records_api.delete_by_id(my_record)
             >>>
             >>> # Delete multiple records
-            >>> record_ids = ["record_123", "record_456", "record_789"]
-            >>> response = records_api.delete_by_id(record_ids)
+            >>> response = records_api.delete_by_id(["record_123", "record_456"])
+            >>> response = records_api.delete_by_id([record_a, record_b])
         """
         headers = Transaction._build_transaction_header(transaction)
 
-        if isinstance(id_or_ids, list):
+        if isinstance(target, list):
+            ids = self._extract_target_ids(target)
             return self.client._make_request(
                 "POST",
                 "/records/delete",
-                {"limit": 1000, "where": {"$id": {"$in": id_or_ids}}},
+                {"limit": 1000, "where": {"$id": {"$in": ids}}},
                 headers,
             )
+        record_id = pick_record_id(target)
         return self.client._make_request(
-            "DELETE", f"/records/{id_or_ids}", None, headers
+            "DELETE", f"/records/{record_id}", None, headers
         )
 
     def find_by_id(
         self,
-        id_or_ids: Union[str, List[str]],
+        target: Union[RecordTarget, List[RecordTarget]],
         transaction: Optional[Transaction] = None,
     ) -> Union["Record", RecordSearchResult]:
         """Retrieve one or more records by their unique identifiers.
@@ -609,17 +616,19 @@ class RecordsAPI(BaseAPI):
         Mirrors the TypeScript SDK ``records.findById`` method.
 
         Args:
-            id_or_ids: A single record ID string or a list of ID strings.
+            target: A single record reference (UUID string, ``Record`` instance, or
+                dict with ``"__id"``), or a list of any of those forms.
             transaction: Optional transaction context for the operation.
 
         Returns:
-            A single :class:`Record` when ``id_or_ids`` is a string, or a
-            :class:`RecordSearchResult` when ``id_or_ids`` is a list.
+            A single :class:`Record` when ``target`` is a single reference, or a
+            :class:`RecordSearchResult` when ``target`` is a list.
         """
         headers = Transaction._build_transaction_header(transaction)
-        if isinstance(id_or_ids, list):
+        if isinstance(target, list):
+            ids = self._extract_target_ids(target)
             response = self.client._make_request(
-                "POST", "/records", {"ids": id_or_ids}, headers
+                "POST", "/records", {"ids": ids}, headers
             )
             records = [Record(self.client, r) for r in (response.get("data") or [])]
             return RecordSearchResult(
@@ -627,21 +636,25 @@ class RecordsAPI(BaseAPI):
                 total=response.get("total", len(records)),
                 client=self.client,
             )
+        record_id = pick_record_id(target)
         response = self.client._make_request(
-            "GET", f"/records/{id_or_ids}", None, headers
+            "GET", f"/records/{record_id}", None, headers
         )
         return Record(self.client, response.get("data", response))
 
     def find(
         self,
         search_query: Optional[SearchQuery] = None,
-        record_id: Optional[str] = None,
+        record_id: Optional[RecordTarget] = None,
         transaction: Optional[Transaction] = None,
     ) -> RecordSearchResult:
         try:
             headers = Transaction._build_transaction_header(transaction)
 
-            path = f"/records/{record_id}/search" if record_id else "/records/search"
+            resolved_id = pick_record_id(record_id) if record_id is not None else None
+            path = (
+                f"/records/{resolved_id}/search" if resolved_id else "/records/search"
+            )
             response = self.client._make_request(
                 "POST",
                 path,
@@ -825,14 +838,7 @@ class RecordsAPI(BaseAPI):
 
     @staticmethod
     def _extract_target_ids(
-        target: Union[
-            str,
-            List[str],
-            Dict[str, Any],
-            List[Dict[str, Any]],
-            "Record",
-            List["Record"],
-        ],
+        target: Union[RecordTarget, List[RecordTarget]],
     ) -> List[str]:
         """Extract record IDs from various input types and formats.
 
@@ -841,14 +847,9 @@ class RecordsAPI(BaseAPI):
         types commonly used throughout the API for specifying target records.
 
         Args:
-            target (Union[str, List[str], Dict[str, Any], List[Dict[str, Any]], Record, List[Record]]):
-                The target input to extract IDs from. Supported formats:
-                - str: Single record ID
-                - List[str]: List of record IDs
-                - Dict[str, Any]: Record dictionary containing '__id' field
-                - List[Dict[str, Any]]: List of record dictionaries with '__id' fields
-                - Record: Record object with data containing '__id'
-                - List[Record]: List of Record objects
+            target (Union[RecordTarget, List[RecordTarget]]): The target input to
+                extract IDs from. Accepts a UUID string, a ``Record`` instance, a
+                dict with ``"__id"``, or a list of any of those forms.
 
         Returns:
             List[str]: List of extracted record ID strings.
