@@ -13,8 +13,18 @@ from .common import NonUniqueResultError, RushDBError
 from .models.api_response import ApiResponse
 from .models.property import Property
 from .models.record import Record, RecordTarget, RelationTarget
-from .models.relationship import RelationshipDetachOptions, RelationshipOptions
+from .models.relationship import (
+    Relationship,
+    RelationshipDetachOptions,
+    RelationshipDirection,
+    RelationshipOptions,
+)
 from .models.result import RecordSearchResult, SearchResult
+from .models.search_query import (
+    RelationshipEndpointQuery,
+    RelationshipSearchQuery,
+    SearchQuery,
+)
 from .models.transaction import Transaction
 
 __all__ = [
@@ -29,8 +39,13 @@ __all__ = [
     "SearchResult",
     "Transaction",
     "Property",
+    "Relationship",
+    "RelationshipDirection",
     "RelationshipOptions",
     "RelationshipDetachOptions",
+    "SearchQuery",
+    "RelationshipEndpointQuery",
+    "RelationshipSearchQuery",
     "QueryAPI",
     "RelationsAPI",
     "RelationshipPatternsAPI",
