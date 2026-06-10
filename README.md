@@ -113,7 +113,17 @@ authored_posts = db.records.find({
 # Manage relationships explicitly
 user = db.records.find_uniq({'labels': ['USER'], 'where': {'name': 'Alice'}})
 company = db.records.find_uniq({'labels': ['COMPANY'], 'where': {'name': 'Acme Corp'}})
-user.attach(target=company, options={'type': 'WORKS_AT', 'direction': 'out'})
+user.attach(
+    target=company,
+    options={'type': 'WORKS_AT', 'direction': 'out', 'properties': {'source': 'profile'}},
+)
+
+# Relationship search: where filters edge type/properties, source/target filter endpoint records
+relationships = db.relationships.find({
+    'source': {'labels': ['USER'], 'where': {'name': 'Alice'}},
+    'target': {'labels': ['COMPANY']},
+    'where': {'type': 'WORKS_AT', 'source': 'profile'},
+})
 ```
 
 ---

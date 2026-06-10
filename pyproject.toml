@@ -1,6 +1,6 @@
 [project]
 name = "rushdb"
-version = "2.2.0"
+version = "2.3.0"
 description = "RushDB Python SDK — memory layer for AI agents and modern apps"
 authors = [
     {name = "RushDB Team", email = "hi@rushdb.com"}
@@ -81,8 +81,6 @@ line-length = 120
 
 [tool.isort]
 profile = "black"
-multi_line_output = 3
-line_length = 120
 
 [dependency-groups]
 dev = [

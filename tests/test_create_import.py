@@ -153,6 +153,53 @@ class TestCreateImport(TestBase):
             source=project, target=employee, options=detach_options
         )
 
+    def test_attach_with_edge_properties_and_find(self):
+        """Test attaching with edge properties and searching edges by them"""
+        movie = self.client.records.create("MOVIE", {"title": "Inception"})
+        actor = self.client.records.create("ACTOR", {"name": "Leonardo DiCaprio"})
+
+        self.client.records.attach(
+            source=movie,
+            target=actor,
+            options=RelationshipOptions(
+                type="STARS_IN",
+                direction="out",
+                properties={"role": "lead", "billing": 1},
+            ),
+        )
+
+        # where filters the edge (type + edge properties);
+        # source/target filter the endpoint records
+        result = self.client.relationships.find(
+            {
+                "source": {"labels": ["MOVIE"], "where": {"title": "Inception"}},
+                "target": {"labels": ["ACTOR"]},
+                "where": {"type": "STARS_IN", "role": "lead", "billing": {"$lte": 3}},
+            }
+        )
+
+        self.assertGreaterEqual(result.total, 1)
+        edge = next(
+            rel
+            for rel in result
+            if rel["sourceId"] == movie.id and rel["targetId"] == actor.id
+        )
+        self.assertEqual(edge["type"], "STARS_IN")
+        self.assertEqual(edge["properties"]["role"], "lead")
+        self.assertEqual(edge["properties"]["billing"], 1)
+
+        # Edge-property mismatch excludes the relationship
+        no_match = self.client.relationships.find(
+            {
+                "source": {"labels": ["MOVIE"], "where": {"title": "Inception"}},
+                "where": {"type": "STARS_IN", "role": "extra"},
+            }
+        )
+        self.assertNotIn(
+            (movie.id, actor.id),
+            [(rel["sourceId"], rel["targetId"]) for rel in no_match],
+        )
+
     def test_create_with_nested_data(self):
         """Test creating records with nested data structure"""
         data = {

@@ -446,6 +446,17 @@ class RecordsAPI(BaseAPI):
             >>>
             >>> # Attach using Record objects
             >>> response = records_api.attach(source_record, target_records)
+            >>>
+            >>> # Attach with a typed relationship carrying edge properties
+            >>> response = records_api.attach(
+            ...     movie,
+            ...     actor,
+            ...     options={
+            ...         "type": "STARS_IN",
+            ...         "direction": "out",
+            ...         "properties": {"role": "lead", "billing": 1},
+            ...     },
+            ... )
         """
         headers = Transaction._build_transaction_header(transaction)
 
