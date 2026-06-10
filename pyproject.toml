@@ -81,8 +81,6 @@ line-length = 120
 
 [tool.isort]
 profile = "black"
-multi_line_output = 3
-line_length = 120
 
 [dependency-groups]
 dev = [
