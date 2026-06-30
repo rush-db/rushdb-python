@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class RelationshipPatternsAPI(BaseAPI):
-    """Review and manage relationship patterns inferred from project ontology.
+    """Review and manage relationship patterns inferred from project schema.
 
     Accessed via ``db.relationships.patterns``.
     """
@@ -27,12 +27,12 @@ class RelationshipPatternsAPI(BaseAPI):
         )
 
     def list(self) -> ApiResponse:
-        """List inferred patterns, ontology relationships, and analysis status."""
+        """List inferred patterns, schema relationships, and analysis status."""
         response = self.client._make_request("GET", "/relationships/patterns")
         return self._wrap(response)
 
     def analyze(self) -> ApiResponse:
-        """Queue ontology analysis to generate relationship pattern suggestions."""
+        """Queue schema analysis to generate relationship pattern suggestions."""
         response = self.client._make_request(
             "POST", "/relationships/patterns/analyze", {}
         )

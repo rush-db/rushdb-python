@@ -136,7 +136,8 @@ csv_data = "name,email,age\nJohn,john@example.com,30\nJane,jane@example.com,25"
 db.records.import_csv(
     label='USER',
     data=csv_data,
-    options={'returnResult': True, 'suggestTypes': True},
+    # skipEmptyValues: treat empty cells ("" / []) as unset instead of storing them (0/False are kept)
+    options={'returnResult': True, 'suggestTypes': True, 'skipEmptyValues': True},
     parse_config={'header': True, 'skipEmptyLines': True, 'dynamicTyping': True},
 )
 ```

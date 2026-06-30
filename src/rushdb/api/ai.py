@@ -1,6 +1,6 @@
 """AI API for RushDB Python SDK.
 
-Provides methods for graph ontology exploration, semantic vector search,
+Provides methods for graph schema exploration, semantic vector search,
 and embedding index management.
 """
 
@@ -123,7 +123,7 @@ class AIAPI(BaseAPI):
     Example::
 
         >>> db = RushDB(api_key="...")
-        >>> ontology = db.ai.get_ontology()
+        >>> schema = db.ai.get_schema()
         >>> results = db.ai.search({"query": "fast cars", "propertyName": "description"})
         >>> db.ai.indexes.create({"propertyName": "description", "label": "Book"})
     """
@@ -132,12 +132,12 @@ class AIAPI(BaseAPI):
         super().__init__(client)
         self.indexes = _AIIndexesNamespace(client)
 
-    def get_ontology(
+    def get_schema(
         self,
         params: Optional[Dict[str, Any]] = None,
         transaction: Optional[Union[Transaction, str]] = None,
     ) -> ApiResponse:
-        """Return the full graph ontology as structured JSON.
+        """Return the full graph schema as structured JSON.
 
         Each item contains the label name, record count, properties with value
         ranges/samples, and cross-label relationships with direction.
@@ -149,13 +149,13 @@ class AIAPI(BaseAPI):
 
         Args:
             params: Optional filter. Pass ``{"labels": ["Label1"]}`` to scope
-                the ontology to specific labels only. Pass ``{"force": True}``
-                to bypass the 1-hour ontology cache and trigger a full
+                the schema to specific labels only. Pass ``{"force": True}``
+                to bypass the 1-hour schema cache and trigger a full
                 recalculation.
             transaction: Optional transaction context.
 
         Returns:
-            ApiResponse: Response whose ``data`` is a list of ontology items.
+            ApiResponse: Response whose ``data`` is a list of schema items.
         """
         headers: Dict[str, str] = {}
         if transaction is not None:
@@ -165,7 +165,7 @@ class AIAPI(BaseAPI):
             headers["x-transaction-id"] = tx_id
 
         response = self.client._make_request(
-            "POST", "/ai/ontology", params or {}, headers=headers or None
+            "POST", "/ai/schema", params or {}, headers=headers or None
         )
         return ApiResponse(
             data=response.get("data"),
@@ -173,12 +173,12 @@ class AIAPI(BaseAPI):
             total=response.get("total"),
         )
 
-    def get_ontology_markdown(
+    def get_schema_markdown(
         self,
         params: Optional[Dict[str, Any]] = None,
         transaction: Optional[Union[Transaction, str]] = None,
     ) -> ApiResponse:
-        """Return the full graph ontology as compact Markdown tables.
+        """Return the full graph schema as compact Markdown tables.
 
         Token-efficient representation intended for direct LLM consumption.
         Includes labels with counts, properties with types and value
@@ -191,7 +191,7 @@ class AIAPI(BaseAPI):
         Args:
             params: Optional filter. Pass ``{"labels": ["Label1"]}`` to scope
                 the output to specific labels only. Pass ``{"force": True}``
-                to bypass the 1-hour ontology cache and trigger a full
+                to bypass the 1-hour schema cache and trigger a full
                 recalculation.
             transaction: Optional transaction context.
 
@@ -206,7 +206,7 @@ class AIAPI(BaseAPI):
             headers["x-transaction-id"] = tx_id
 
         response = self.client._make_request(
-            "POST", "/ai/ontology/md", params or {}, headers=headers or None
+            "POST", "/ai/schema/md", params or {}, headers=headers or None
         )
         return ApiResponse(
             data=response.get("data"),

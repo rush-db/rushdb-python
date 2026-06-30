@@ -19,7 +19,7 @@ class ApiResponse(Generic[T]):
         total: Optional total count (e.g. for list endpoints).
 
     Example:
-        >>> response = db.ai.get_ontology_markdown()
+        >>> response = db.ai.get_schema_markdown()
         >>> schema_md = response.data          # str
         >>> response = db.ai.indexes.find()
         >>> indexes = response.data            # list[dict]
