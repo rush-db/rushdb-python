@@ -172,6 +172,8 @@ class RecordsAPI(BaseAPI):
                 Available options:
                 - returnResult (bool): Whether to return the created record data. Defaults to True.
                 - suggestTypes (bool): Whether to automatically suggest data types. Defaults to True.
+                - skipEmptyValues (bool): Treat empty strings ("") and empty arrays ([]) as unset —
+                  no property is created. 0 and False are kept. Defaults to False.
             vectors (Optional[List[Dict[str, Any]]]): Optional pre-computed embedding vectors
                 to write alongside the record. Each entry must contain at least
                 ``propertyName`` and ``vector``; ``similarityFunction`` is required when
@@ -231,7 +233,9 @@ class RecordsAPI(BaseAPI):
                 record. Nested objects/arrays are not supported here — raises
                 ``ValueError`` if any item contains a nested object or list.
             options: Optional write options forwarded as-is to the server
-                (e.g. ``suggestTypes``, ``mergeBy``, ``mergeStrategy``, etc.).
+                (e.g. ``suggestTypes``, ``skipEmptyValues``, ``mergeBy``,
+                ``mergeStrategy``, etc.). ``skipEmptyValues`` treats empty strings
+                and empty arrays as unset (``0``/``False`` are kept); defaults to False.
             vectors: Optional per-row inline vectors for external embedding indexes.
                 ``vectors[i]`` is applied to ``data[i]``. Each element is a list of
                 vector entry dicts: ``[{"propertyName": str, "vector": List[float],

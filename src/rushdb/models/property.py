@@ -21,8 +21,9 @@ BooleanValue = bool
 NumberValue = Union[float, int]
 StringValue = str
 
-# Property types
-PropertyType = Literal["boolean", "datetime", "null", "number", "string"]
+# Property types. A None/null value means the field is unset; `None` is still accepted as an
+# input value in `PropertyWithValue.value` below.
+PropertyType = Literal["boolean", "datetime", "number", "string"]
 
 
 class Property(TypedDict):
