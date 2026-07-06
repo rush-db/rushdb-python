@@ -144,7 +144,9 @@ class RushDB:
             else None
         )
         effective_url = url or base_url or self.DEFAULT_BASE_URL
-        if url and "/api/" not in effective_url:
+        # Both `url` and its deprecated alias `base_url` are documented to get
+        # `/api/v1` appended when the path is absent.
+        if (url or base_url) and "/api/" not in effective_url:
             effective_url = effective_url.rstrip("/") + "/api/v1"
         self.base_url = effective_url.rstrip("/")
         self.api_key = api_key
@@ -245,8 +247,17 @@ class RushDB:
             with urllib.request.urlopen(request) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            error_body = json.loads(e.read().decode("utf-8"))
-            raise RushDBError(error_body.get("message", str(e)), error_body)
+            # Error bodies are usually JSON, but a gateway/proxy may return HTML or an
+            # empty body — without this guard the JSONDecodeError raised here would
+            # escape as-is instead of surfacing as a RushDBError.
+            try:
+                error_body = json.loads(e.read().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                error_body = {}
+            message = error_body.get("message")
+            if isinstance(message, list):
+                message = "; ".join(str(item) for item in message)
+            raise RushDBError(message or f"HTTP {e.code}", error_body, status=e.code)
         except urllib.error.URLError as e:
             raise RushDBError(f"Connection error: {str(e)}")
         except json.JSONDecodeError as e:

@@ -1,6 +1,10 @@
 """Test cases for RushDB search query functionality."""
 
+import time
 import unittest
+import uuid
+
+from src.rushdb import RushDB
 
 from .test_base_setup import TestBase
 
@@ -387,6 +391,215 @@ class TestSearchQuery(TestBase):
             "orderBy": {"total": "asc"},
         }
         self.client.records.find(query)
+
+
+class TestMultihopAndCycles(TestBase):
+    """Variable-length traversal ($relation.hops) and cycle detection ($cycle).
+
+    Seeds its own graph, isolated by a unique tenantId:
+
+        Reporting chain (MHEmployee, REPORTS_TO, directed "up"):
+            E1 -> E2 -> E3 -> E4
+
+        Transfer ring + linear chain (MHAccount, TRANSFERRED_TO):
+            A -> B -> C -> A        (3-hop directed ring)
+            X -> Y -> Z             (no cycle)
+    """
+
+    tenant: str
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.tenant = f"multihop-{uuid.uuid4().hex[:8]}"
+        # TestBase only creates a client per-test (setUp); seeding needs one here.
+        cls.client = RushDB(cls.token, base_url=cls.base_url)
+
+        cls.client.records.create_many(
+            "MHEmployee",
+            [
+                {"name": "E1", "managerName": "E2", "tenantId": cls.tenant},
+                {"name": "E2", "managerName": "E3", "tenantId": cls.tenant},
+                {"name": "E3", "managerName": "E4", "tenantId": cls.tenant},
+                {"name": "E4", "tenantId": cls.tenant},
+            ],
+        )
+        cls.client.relationships.create_many(
+            source={
+                "label": "MHEmployee",
+                "key": "managerName",
+                "where": {"tenantId": cls.tenant},
+            },
+            target={
+                "label": "MHEmployee",
+                "key": "name",
+                "where": {"tenantId": cls.tenant},
+            },
+            type="REPORTS_TO",
+            direction="out",
+        )
+
+        cls.client.records.create_many(
+            "MHAccount",
+            [
+                {"name": "A", "sendsTo": "B", "tenantId": cls.tenant},
+                {"name": "B", "sendsTo": "C", "tenantId": cls.tenant},
+                {"name": "C", "sendsTo": "A", "tenantId": cls.tenant},
+                {"name": "X", "sendsTo": "Y", "tenantId": cls.tenant},
+                {"name": "Y", "sendsTo": "Z", "tenantId": cls.tenant},
+                {"name": "Z", "tenantId": cls.tenant},
+            ],
+        )
+        cls.client.relationships.create_many(
+            source={
+                "label": "MHAccount",
+                "key": "sendsTo",
+                "where": {"tenantId": cls.tenant},
+            },
+            target={
+                "label": "MHAccount",
+                "key": "name",
+                "where": {"tenantId": cls.tenant},
+            },
+            type="TRANSFERRED_TO",
+            direction="out",  # sender -> receiver
+        )
+
+        # relationships.create_many is applied via apoc.periodic.iterate — poll
+        # until both relationship sets are visible.
+        for _ in range(10):
+            employee_rels = cls.client.relationships.find(
+                {
+                    "source": {
+                        "labels": ["MHEmployee"],
+                        "where": {"tenantId": cls.tenant},
+                    },
+                    "limit": 100,
+                }
+            )
+            account_rels = cls.client.relationships.find(
+                {
+                    "source": {
+                        "labels": ["MHAccount"],
+                        "where": {"tenantId": cls.tenant},
+                    },
+                    "limit": 100,
+                }
+            )
+            if len(employee_rels.data) >= 3 and len(account_rels.data) >= 5:
+                break
+            time.sleep(1)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.records.delete({"where": {"tenantId": cls.tenant}})
+        super().tearDownClass()
+
+    def _names(self, result):
+        return sorted(record.get("name") for record in result)
+
+    def test_hops_range_reaches_chain_top(self):
+        """hops {max: 3} reaches E4 from every subordinate"""
+        result = self.client.records.find(
+            {
+                "labels": ["MHEmployee"],
+                "where": {
+                    "tenantId": self.tenant,
+                    "MHEmployee": {
+                        "$relation": {
+                            "type": "REPORTS_TO",
+                            "direction": "out",
+                            "hops": {"max": 3},
+                        },
+                        "name": "E4",
+                    },
+                },
+            }
+        )
+        self.assertEqual(self._names(result), ["E1", "E2", "E3"])
+
+    def test_hops_range_is_bounded(self):
+        """hops {max: 2} does not reach 3 hops away"""
+        result = self.client.records.find(
+            {
+                "labels": ["MHEmployee"],
+                "where": {
+                    "tenantId": self.tenant,
+                    "MHEmployee": {
+                        "$relation": {
+                            "type": "REPORTS_TO",
+                            "direction": "out",
+                            "hops": {"max": 2},
+                        },
+                        "name": "E4",
+                    },
+                },
+            }
+        )
+        self.assertEqual(self._names(result), ["E2", "E3"])
+
+    def test_hops_exact_count(self):
+        """hops: 3 matches exactly 3 hops"""
+        result = self.client.records.find(
+            {
+                "labels": ["MHEmployee"],
+                "where": {
+                    "tenantId": self.tenant,
+                    "MHEmployee": {
+                        "$relation": {
+                            "type": "REPORTS_TO",
+                            "direction": "out",
+                            "hops": 3,
+                        },
+                        "name": "E4",
+                    },
+                },
+            }
+        )
+        self.assertEqual(self._names(result), ["E1"])
+
+    def test_cycle_flags_ring_members(self):
+        """$cycle returns exactly the ring participants with a deduplicated total"""
+        result = self.client.records.find(
+            {
+                "labels": ["MHAccount"],
+                "where": {
+                    "tenantId": self.tenant,
+                    "RING": {
+                        "$cycle": True,
+                        "$relation": {
+                            "type": "TRANSFERRED_TO",
+                            "direction": "out",
+                            "hops": {"min": 2, "max": 6},
+                        },
+                    },
+                },
+            }
+        )
+        self.assertEqual(self._names(result), ["A", "B", "C"])
+        self.assertEqual(result.total, 3)
+
+    def test_not_cycle_excludes_ring_members(self):
+        """$not around a $cycle block finds acyclic accounts"""
+        result = self.client.records.find(
+            {
+                "labels": ["MHAccount"],
+                "where": {
+                    "tenantId": self.tenant,
+                    "$not": {
+                        "RING": {
+                            "$cycle": True,
+                            "$relation": {
+                                "type": "TRANSFERRED_TO",
+                                "direction": "out",
+                                "hops": {"min": 2, "max": 6},
+                            },
+                        }
+                    },
+                },
+            }
+        )
+        self.assertEqual(self._names(result), ["X", "Y", "Z"])
 
 
 if __name__ == "__main__":

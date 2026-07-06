@@ -11,6 +11,9 @@ from .search_query import (
     RelationshipEndpointQuery,
     RelationshipSearchQuery,
     SearchQuery,
+    TraversalHops,
+    TraversalHopsRange,
+    TraversalRelationOptions,
 )
 from .transaction import Transaction
 
@@ -26,5 +29,8 @@ __all__ = [
     "SearchQuery",
     "RelationshipEndpointQuery",
     "RelationshipSearchQuery",
+    "TraversalHops",
+    "TraversalHopsRange",
+    "TraversalRelationOptions",
     "Transaction",
 ]

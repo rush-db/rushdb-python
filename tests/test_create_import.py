@@ -40,7 +40,7 @@ class TestCreateImport(TestBase):
         # Test new functionality
         self.assertEqual(record.get("name"), "Google LLC")
         self.assertEqual(record.get("nonexistent", "default"), "default")
-        self.assertTrue(record.exists())
+        self.assertTrue(record.exists)
 
     def test_record_methods(self):
         """Test Record class methods"""
@@ -201,7 +201,11 @@ class TestCreateImport(TestBase):
         )
 
     def test_create_with_nested_data(self):
-        """Test creating records with nested data structure"""
+        """Test importing records with nested data structure.
+
+        ``create_many`` accepts flat rows only (it raises ``ValueError`` for
+        nested payloads); nested JSON goes through ``import_json``.
+        """
         data = {
             "name": "Meta Platforms Inc",
             "rating": 4.6,
@@ -220,7 +224,9 @@ class TestCreateImport(TestBase):
                 }
             ],
         }
-        self.client.records.create_many("COMPANY", data)
+        with self.assertRaises(ValueError):
+            self.client.records.create_many("COMPANY", data)
+        self.client.records.import_json(data=data, label="COMPANY")
 
     def test_transaction_rollback(self):
         """Test transaction rollback"""

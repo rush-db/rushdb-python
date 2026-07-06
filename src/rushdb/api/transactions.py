@@ -51,7 +51,8 @@ class TransactionsAPI(BaseAPI):
         Args:
             ttl (Optional[int], optional): Time-to-live in milliseconds for the transaction.
                 After this time, the transaction will automatically expire and be rolled back.
-                If None, defaults to 5000ms (5 seconds). Defaults to None.
+                If None, defaults to 5000ms (5 seconds). Values above the server-side cap
+                (60 seconds) are clamped to it. Defaults to None.
 
         Returns:
             Transaction: A Transaction object that can be used with other API operations.
