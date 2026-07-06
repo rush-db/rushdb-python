@@ -4,7 +4,7 @@ import time
 import unittest
 import uuid
 
-from src.rushdb import RushDB
+from src.rushdb import RushDB, RushDBError
 
 from .test_base_setup import TestBase
 
@@ -414,6 +414,17 @@ class TestMultihopAndCycles(TestBase):
         cls.tenant = f"multihop-{uuid.uuid4().hex[:8]}"
         # TestBase only creates a client per-test (setUp); seeding needs one here.
         cls.client = RushDB(cls.token, base_url=cls.base_url)
+
+        # TestBase skips per-test in setUp when the server is unreachable; this
+        # class seeds data in setUpClass, so it must skip here for the same
+        # reason (e.g. CI without a running RushDB) instead of erroring.
+        try:
+            if not cls.client.ping():
+                raise unittest.SkipTest(
+                    f"Could not connect to RushDB at {cls.base_url}"
+                )
+        except RushDBError as e:
+            raise unittest.SkipTest(f"RushDB connection error: {str(e)}")
 
         cls.client.records.create_many(
             "MHEmployee",
