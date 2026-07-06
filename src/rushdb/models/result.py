@@ -246,5 +246,10 @@ class SearchResult(Generic[T]):
         return pd.DataFrame(rows)
 
 
-# Type alias for record search results
-RecordSearchResult = SearchResult[Record]
+class RecordSearchResult(SearchResult[Record]):
+    """Search result specialized for ``Record`` items.
+
+    A real subclass (not a ``SearchResult[Record]`` alias) so that
+    ``isinstance(result, RecordSearchResult)`` works — isinstance checks against
+    subscripted generics raise ``TypeError`` at runtime.
+    """

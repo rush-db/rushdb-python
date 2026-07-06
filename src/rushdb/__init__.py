@@ -24,6 +24,9 @@ from .models.search_query import (
     RelationshipEndpointQuery,
     RelationshipSearchQuery,
     SearchQuery,
+    TraversalHops,
+    TraversalHopsRange,
+    TraversalRelationOptions,
 )
 from .models.transaction import Transaction
 
@@ -46,6 +49,9 @@ __all__ = [
     "SearchQuery",
     "RelationshipEndpointQuery",
     "RelationshipSearchQuery",
+    "TraversalHops",
+    "TraversalHopsRange",
+    "TraversalRelationOptions",
     "QueryAPI",
     "RelationsAPI",
     "RelationshipPatternsAPI",

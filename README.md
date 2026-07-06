@@ -110,6 +110,28 @@ authored_posts = db.records.find({
     'limit': 10,
 })
 
+# Multi-hop: add hops to $relation — everyone in Alice's reporting chain, up to 4 levels
+chain = db.records.find({
+    'labels': ['EMPLOYEE'],
+    'where': {
+        'EMPLOYEE': {
+            '$relation': {'type': 'REPORTS_TO', 'direction': 'out', 'hops': {'min': 1, 'max': 4}},
+            'name': {'$contains': 'Alice'},
+        }
+    },
+})
+
+# Cycle detection: accounts on a circular transfer ring (fraud rings, circular ownership)
+ring_members = db.records.find({
+    'labels': ['ACCOUNT'],
+    'where': {
+        'RING': {  # key is a display name — the $cycle block holds only $relation
+            '$cycle': True,
+            '$relation': {'type': 'TRANSFERRED_TO', 'direction': 'out', 'hops': {'min': 2, 'max': 6}},
+        }
+    },
+})
+
 # Manage relationships explicitly
 user = db.records.find_uniq({'labels': ['USER'], 'where': {'name': 'Alice'}})
 company = db.records.find_uniq({'labels': ['COMPANY'], 'where': {'name': 'Acme Corp'}})
