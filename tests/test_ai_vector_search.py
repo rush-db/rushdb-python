@@ -13,7 +13,9 @@ class TestVectorAndSmartSearch(unittest.TestCase):
         client._make_request.return_value = {
             "success": True,
             "total": 1,
-            "data": [{"__id": "doc_1", "__label": "Doc", "title": "Alpha", "__score": 0.91}],
+            "data": [
+                {"__id": "doc_1", "__label": "Doc", "title": "Alpha", "__score": 0.91}
+            ],
         }
 
         result = RecordsAPI(client).vector_search(
@@ -85,7 +87,9 @@ class TestVectorAndSmartSearch(unittest.TestCase):
                 {"X-Transaction-Id": "tx_123"},
             ),
         )
-        self.assertEqual(result.search_query, {"labels": ["Pilot"], "where": {"ship": "Falcon"}})
+        self.assertEqual(
+            result.search_query, {"labels": ["Pilot"], "where": {"ship": "Falcon"}}
+        )
         self.assertEqual(result.warnings, ["ambiguous ship name"])
         self.assertEqual(result[0].get("name"), "Han")
 
@@ -96,7 +100,9 @@ class TestVectorAndSmartSearch(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            result = AIAPI(client).search({"labels": ["Doc"], "propertyName": "body", "query": "graph"})
+            result = AIAPI(client).search(
+                {"labels": ["Doc"], "propertyName": "body", "query": "graph"}
+            )
 
         client.records.vector_search.assert_called_once_with(
             {"labels": ["Doc"], "propertyName": "body", "query": "graph"},
