@@ -688,6 +688,46 @@ class RecordsAPI(BaseAPI):
         except Exception:
             return RecordSearchResult(data=[], total=0, client=self.client)
 
+    def vector_search(
+        self,
+        params: Dict[str, Any],
+        transaction: Optional[Union[Transaction, str]] = None,
+    ) -> RecordSearchResult:
+        """Perform vector similarity search over indexed record properties.
+
+        This is the Python SDK counterpart to the TypeScript
+        ``db.records.vectorSearch({...})`` method. RushDB narrows candidates by
+        ``labels`` and optional ``where`` filters first, then ranks them by
+        vector similarity. Pass ``query`` for managed indexes or ``queryVector``
+        for external/custom vectors.
+
+        Args:
+            params: Vector search parameters. Expected keys:
+
+                - ``propertyName`` (str): Property that has an embedding index.
+                - ``labels`` (list[str]): Labels to scope the search.
+                - ``query`` (str, optional): Text query for managed indexes.
+                - ``queryVector`` (list[float], optional): Pre-computed vector.
+                - ``where`` (dict, optional): Additional property filters.
+                - ``limit`` (int, optional): Maximum number of results.
+                - ``skip`` (int, optional): Number of results to skip.
+                - ``topK`` (int, optional): Candidate count in direct vector mode.
+            transaction: Optional transaction context.
+
+        Returns:
+            RecordSearchResult: Matching records ranked by similarity. Each
+            record may include ``__score``.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        response = self.client._make_request("POST", "/ai/search", params, headers)
+        records = [Record(self.client, item) for item in response.get("data", [])]
+        return RecordSearchResult(
+            data=records,
+            total=response.get("total", len(records)),
+            search_query=typing.cast(SearchQuery, params),
+            client=self.client,
+        )
+
     def find_one(
         self,
         search_query: Optional[SearchQuery] = None,

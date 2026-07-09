@@ -30,6 +30,7 @@ class SearchResult(Generic[T]):
         total: Optional[int] = None,
         search_query: Optional[SearchQuery] = None,
         client: Optional["RushDB"] = None,
+        warnings: Optional[List[str]] = None,
     ):
         """
         Initialize search result.
@@ -39,11 +40,13 @@ class SearchResult(Generic[T]):
             total: Total number of matching records (may be larger than len(data))
             search_query: The search query used to generate this result
             client: Optional RushDB client instance (required for delete_all, next, set_properties)
+            warnings: Optional warnings returned by AI-assisted query generation
         """
         self._data = data
         self._total = total or len(data)
         self._search_query = search_query or {}
         self._client = client
+        self._warnings = warnings or []
 
     @property
     def data(self) -> List[T]:
@@ -59,6 +62,11 @@ class SearchResult(Generic[T]):
     def search_query(self) -> SearchQuery:
         """Get the search query used to generate this result."""
         return self._search_query
+
+    @property
+    def warnings(self) -> List[str]:
+        """Get warnings returned by AI-assisted query generation."""
+        return self._warnings
 
     @property
     def has_more(self) -> bool:
@@ -106,6 +114,7 @@ class SearchResult(Generic[T]):
             "total": self.total,
             "data": self.data,
             "search_query": self.search_query,
+            "warnings": self.warnings,
         }
 
     def get_page_info(self) -> dict:

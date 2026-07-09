@@ -1,13 +1,16 @@
 """AI API for RushDB Python SDK.
 
-Provides methods for graph schema exploration, semantic vector search,
+Provides methods for AI-assisted graph exploration, smart search,
 and embedding index management.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+import warnings
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union, cast
 
 from ..models.api_response import ApiResponse
 from ..models.record import Record
+from ..models.result import RecordSearchResult
+from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
@@ -124,7 +127,12 @@ class AIAPI(BaseAPI):
 
         >>> db = RushDB(api_key="...")
         >>> schema = db.ai.get_schema()
-        >>> results = db.ai.search({"query": "fast cars", "propertyName": "description"})
+        >>> results = db.ai.search("books about fast cars")
+        >>> vectors = db.records.vector_search({
+        ...     "query": "fast cars",
+        ...     "propertyName": "description",
+        ...     "labels": ["Book"],
+        ... })
         >>> db.ai.indexes.create({"propertyName": "description", "label": "Book"})
     """
 
@@ -145,7 +153,7 @@ class AIAPI(BaseAPI):
         indexes exist for that property — each entry exposes ``id``,
         ``sourceType``, ``similarityFunction``, ``dimensions``, ``status``, and
         ``modelKey``.  A non-empty ``vectorIndexes`` list means the property is
-        queryable with ``db.ai.search()``.
+        queryable with ``db.records.vector_search()``.
 
         Args:
             params: Optional filter. Pass ``{"labels": ["Label1"]}`` to scope
@@ -214,35 +222,60 @@ class AIAPI(BaseAPI):
             total=response.get("total"),
         )
 
-    def search(self, params: Dict[str, Any]) -> ApiResponse:
-        """Perform semantic (vector) search over indexed record properties.
+    def search(
+        self,
+        prompt: Union[str, Dict[str, Any]],
+        current_query: Optional[SearchQuery] = None,
+        transaction: Optional[Union[Transaction, str]] = None,
+    ) -> RecordSearchResult:
+        """Perform AI-assisted smart search from natural language.
 
-        **Direct vector-index mode** (default, fast): used when no ``where``
-        filter and at most one ``labels`` entry. Queries the shared global
-        vector index directly.
+        RushDB converts ``prompt`` into a SearchQuery using the project schema,
+        executes it, and returns matching records with the generated query
+        attached to ``result.search_query``.
 
-        **Prefilter mode** (exact, slower): activated when a ``where``
-        filter is supplied or ``labels`` contains more than one value.
-        Candidates are first narrowed by MATCH/WHERE, then ranked by exact
-        cosine similarity.
+        Use ``db.records.vector_search({...})`` for direct vector similarity
+        over embedding indexes.
 
         Args:
-            params: Search parameters. Expected keys:
-
-                - ``query`` (str): The natural-language query text.
-                - ``propertyName`` (str): Property that has been embedded.
-                - ``labels`` (list[str], optional): Scope to specific labels.
-                - ``where`` (dict, optional): Additional property filters.
-                - ``limit`` (int, optional): Maximum number of results.
+            prompt: Natural-language search request. Passing a dict is
+                deprecated and delegates to ``db.records.vector_search``.
+            current_query: Optional current SearchQuery context from a
+                dashboard/query-builder session.
+            transaction: Optional transaction context.
 
         Returns:
-            ApiResponse: Response whose ``data`` is a list of semantic search
-            result objects (each includes the matched record and a score).
+            RecordSearchResult: Matching records. The generated SearchQuery is
+            available as ``result.search_query`` and server warnings as
+            ``result.warnings``.
         """
-        response = self.client._make_request("POST", "/ai/search", params)
+        if isinstance(prompt, dict):
+            warnings.warn(
+                "db.ai.search({...}) is deprecated for vector search; "
+                "use db.records.vector_search({...}) instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self.client.records.vector_search(prompt, transaction=transaction)
+
+        headers = Transaction._build_transaction_header(transaction)
+        generated = self.client._make_request(
+            "POST",
+            "/ai/search-query",
+            {"prompt": prompt, "currentQuery": current_query},
+            headers,
+        )
+        generated_data = generated.get("data") or {}
+        search_query = generated_data.get("searchQuery") or {}
+
+        response = self.client._make_request(
+            "POST", "/records/search", search_query, headers
+        )
         records = [Record(self.client, item) for item in response.get("data", [])]
-        return ApiResponse(
+        return RecordSearchResult(
             data=records,
-            success=response.get("success", True),
-            total=response.get("total"),
+            total=response.get("total", len(records)),
+            search_query=cast(SearchQuery, search_query),
+            client=self.client,
+            warnings=generated_data.get("warnings") or [],
         )

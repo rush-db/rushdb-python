@@ -202,6 +202,37 @@ if result:
 
 ---
 
+## Vector Search And Smart Search
+
+Use `db.records.vector_search()` for direct semantic/vector retrieval over an
+embedding index:
+
+```python
+results = db.records.vector_search({
+    'labels': ['MEMORY'],
+    'propertyName': 'content',
+    'query': 'how agents remember things',
+    'where': {'agent_id': 'agent-42'},
+    'limit': 5,
+})
+
+for record in results:
+    print(record.score, record.get('content'))
+```
+
+Use `db.ai.search()` when you want RushDB to turn a natural-language request
+into a SearchQuery and execute it:
+
+```python
+results = db.ai.search('Find active memories about Q4 results for agent-42')
+print(results.search_query)
+```
+
+`db.ai.search({...})` still works as a deprecated vector-search alias, but new
+code should use `db.records.vector_search({...})`.
+
+---
+
 ## Record API
 
 ```python
