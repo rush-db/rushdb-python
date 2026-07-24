@@ -214,7 +214,9 @@ class RecordsAPI(BaseAPI):
         label: str,
         data: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None,
-        vectors: Optional[List[Optional[List[Dict[str, Any]]]]] = None,
+        vectors: Optional[
+            Union[List[Optional[List[Dict[str, Any]]]], List[Dict[str, Any]]]
+        ] = None,
         transaction: Optional[Transaction] = None,
     ) -> RecordSearchResult:
         """Create multiple flat records in a single operation.
@@ -237,10 +239,19 @@ class RecordsAPI(BaseAPI):
                 ``mergeStrategy``, etc.). ``skipEmptyValues`` treats empty strings
                 and empty arrays as unset (``0``/``False`` are kept); defaults to False.
             vectors: Optional per-row inline vectors for external embedding indexes.
-                ``vectors[i]`` is applied to ``data[i]``. Each element is a list of
-                vector entry dicts: ``[{"propertyName": str, "vector": List[float],
-                "similarityFunction"?: str}]``. Its length must not exceed
-                ``len(data)``. Pass ``None`` in a slot to skip a row.
+                Accepts two forms:
+
+                * **Nested** (``List[Optional[List[Dict]]]``) — ``vectors[i]`` is
+                  applied to ``data[i]``. Each element is a list of vector entry
+                  dicts: ``[{"propertyName": str, "vector": List[float],
+                  "similarityFunction"?: str}]``. Pass ``None`` to skip a row.
+                  This is the canonical form.
+
+                * **Flat** (``List[Dict]``) — a single-level list of vector entries
+                  auto-wrapped into per-record lists. Useful for one-vector-per-record
+                  batches where the outer per-record nesting adds no information.
+
+                In both forms the length must not exceed ``len(data)``.
             transaction: Optional transaction context for the operation.
 
         Returns:
@@ -258,6 +269,12 @@ class RecordsAPI(BaseAPI):
                 "records.create_many supports only flat records (no nested objects/arrays). "
                 "Use records.import_json for nested JSON."
             )
+
+        # Normalise flat List[Dict] to per-row List[List[Dict]]
+        if vectors is not None and len(vectors) > 0:
+            first_non_null = next((v for v in vectors if v is not None), None)
+            if isinstance(first_non_null, dict):
+                vectors = [[v] for v in vectors]
 
         if vectors is not None and len(vectors) > len(items):
             raise ValueError(

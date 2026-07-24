@@ -352,7 +352,7 @@ class TestRecordScoreProperty(unittest.TestCase):
         self.assertEqual(record.score, 0.95)
 
     def test_score_excluded_from_fields(self):
-        """__score is not included in record.fields."""
+        """__score follows the __ convention and is excluded from fields."""
         record = Record(
             self.mock_client,
             {"__id": "1", "__label": "User", "__score": 0.8, "name": "X"},
