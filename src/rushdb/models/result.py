@@ -31,6 +31,7 @@ class SearchResult(Generic[T]):
         search_query: Optional[SearchQuery] = None,
         client: Optional["RushDB"] = None,
         warnings: Optional[List[str]] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize search result.
@@ -41,12 +42,15 @@ class SearchResult(Generic[T]):
             search_query: The search query used to generate this result
             client: Optional RushDB client instance (required for delete_all, next, set_properties)
             warnings: Optional warnings returned by AI-assisted query generation
+            meta: How a vector, keyword or hybrid search ran (``vectorSearch``,
+                ``textSearch``, ``fusion``)
         """
         self._data = data
         self._total = total or len(data)
         self._search_query = search_query or {}
         self._client = client
         self._warnings = warnings or []
+        self._meta = meta or {}
 
     @property
     def data(self) -> List[T]:
@@ -67,6 +71,13 @@ class SearchResult(Generic[T]):
     def warnings(self) -> List[str]:
         """Get warnings returned by AI-assisted query generation."""
         return self._warnings
+
+    @property
+    def meta(self) -> Dict[str, Any]:
+        """How a search ran: ``textSearch`` (``matches``, ``pending``) for a
+        keyword search; ``vectorSearch``, ``textSearch`` and ``fusion`` for a
+        vector or hybrid one. Empty for other searches."""
+        return self._meta
 
     @property
     def has_more(self) -> bool:

@@ -37,6 +37,60 @@ pip install rushdb
 
 ---
 
+## RushDB Cloud or a standalone engine
+
+The SDK works with RushDB in one of two ways:
+
+| | RushDB Cloud (or a self-hosted RushDB platform) | A standalone engine (direct mode) |
+| --- | --- | --- |
+| What you run | nothing ([app.rushdb.com](https://app.rushdb.com)), or the platform's Docker image | one `rushdbd` binary |
+| Connect with | an API key | the engine URL and the engine token |
+
+```python
+from rushdb import RushDB
+
+# RushDB Cloud
+db = RushDB("RUSHDB_API_KEY")
+
+# A standalone engine
+db = RushDB(
+    "ENGINE_TOKEN",
+    direct=True,
+    engine_url="http://127.0.0.1:3000",
+    scope="tenant-1",  # only for an engine started with --multitenant
+)
+```
+
+What each offers:
+
+| Feature | Cloud | Standalone |
+| --- | :---: | :---: |
+| Records: create, read, update, set, upsert, delete, `find` with `where`, `orderBy`, `select`, `groupBy` | ✓ | ✓ |
+| Relationships: `attach`/`detach`, `relationships.create_many`/`delete_many`/`find` | ✓ | ✓ |
+| Labels, properties, property values | ✓ | ✓ |
+| Import JSON and CSV, export CSV | ✓ | ✓ |
+| External vector indexes; vector search with a `queryVector` you supply | ✓ | ✓ |
+| Raw openCypher (`query.raw`; the engine needs `--languages cypher`) | ✓ | ✓ |
+| Schema (`ai.get_schema`, `ai.get_schema_markdown`) | ✓ | ✓ |
+| Keyword (BM25) search (`records.text_search`), text indexes (`text_indexes.*`), hybrid search | ✓ | ✓ |
+| Transactions | ✓ | record creates, updates, sets, deletes by id, attaches and imports are staged; other writes refuse a transaction |
+| Managed embeddings: managed indexes, `records.vector_search` by text `query` | ✓ | — |
+| Natural-language search (`ai.search`) | ✓ | — |
+| Relationship-pattern suggestions (`relationships.patterns.*`) | ✓ | — |
+| Project settings (`settings.get`), dashboard, team access | ✓ | — |
+
+In direct mode a Cloud-only method raises `CloudOnlyError` (with `method` and `reason`) before
+sending anything, and no request ever goes to RushDB Cloud. A write the engine cannot stage into a
+transaction raises `DirectModeError`, also before sending anything. The list is available in code:
+
+```python
+from rushdb import CLOUD_ONLY_METHODS, CloudOnlyError, is_cloud_only_method
+```
+
+`db.engine.execute()` runs any Protocol v1 operation directly.
+
+---
+
 ## Agent memory in 3 lines
 
 Get an API key at [app.rushdb.com](https://app.rushdb.com).
@@ -230,6 +284,36 @@ print(results.search_query)
 
 `db.ai.search({...})` still works as a deprecated vector-search alias, but new
 code should use `db.records.vector_search({...})`.
+
+## Keyword And Hybrid Search
+
+Declare a BM25 text index, then search it by keywords:
+
+```python
+db.text_indexes.create({'label': 'MEMORY', 'property': 'content'})
+
+results = db.records.text_search({
+    'query': 'quarterly results',
+    'labels': ['MEMORY'],
+    'where': {'agent_id': 'agent-42'},
+    'limit': 5,
+})
+print(results.total, results.meta['textSearch'])
+```
+
+Add a `text` leg to a vector search to fuse keyword and vector ranking. `fusion`
+is `rrf` (default) or `dbsf`; `weight` and `prefetchLimit` tune each leg:
+
+```python
+results = db.records.vector_search({
+    'labels': ['MEMORY'],
+    'propertyName': 'content',
+    'queryVector': embedding,
+    'text': {'query': 'quarterly results', 'weight': 0.5},
+    'fusion': 'dbsf',
+    'limit': 5,
+})
+```
 
 ---
 

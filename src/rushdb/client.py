@@ -17,8 +17,11 @@ from .api.properties import PropertiesAPI
 from .api.query import QueryAPI
 from .api.records import RecordsAPI
 from .api.relationships import RelationsAPI
+from .api.text_indexes import TextIndexesAPI
 from .api.transactions import TransactionsAPI
 from .common import RushDBError
+from .direct import DirectEngine
+from .direct import router as direct_router
 from .utils.token_prefix import extract_mixed_properties_from_token
 
 
@@ -100,6 +103,10 @@ class RushDB:
         api_key: str,
         base_url: Optional[str] = None,
         url: Optional[str] = None,
+        direct: bool = False,
+        engine_url: Optional[str] = None,
+        engine_token: Optional[str] = None,
+        scope: Optional[str] = None,
     ):
         """Initialize the RushDB client with authentication and connection settings.
 
@@ -114,32 +121,41 @@ class RushDB:
                 (e.g. ``"https://my-rushdb.company.com/api/v1"``). Deprecated alias
                 kept for backwards compatibility — prefer ``url``.
             url (Optional[str], optional): Base URL for a self-hosted RushDB server.
-                When provided without a ``/api/`` component the path ``/api/v1`` is
+                When provided without an ``/api/`` component the path ``/api/v1`` is
                 appended automatically.  Defaults to None, which uses
                 ``DEFAULT_BASE_URL``.
+            direct (bool, optional): When ``True``, talks to a standalone
+                ``rushdbd`` engine instead of RushDB Cloud. Every method is
+                answered from the engine; the methods in
+                ``rushdb.CLOUD_ONLY_METHODS`` raise ``CloudOnlyError`` before
+                sending anything, and no request ever goes to RushDB Cloud. The
+                protocol transport is ``client.engine``.
+            engine_url (Optional[str], optional): Standalone engine base URL (e.g.
+                ``"http://127.0.0.1:3000"``). Required when ``direct=True``.
+            engine_token (Optional[str], optional): The engine boot token. Defaults
+                to ``api_key`` when not provided.
+            scope (Optional[str], optional): Tenant scope sent to the engine in
+                multitenant mode.
 
         Raises:
-            ValueError: If api_key is empty or None.
+            ValueError: If api_key is empty or None, or ``direct=True`` without
+                ``engine_url``.
 
         Example:
             >>> # Using default public API
             >>> client = RushDB(api_key="your_api_key")
             >>>
-            >>> # Using self-hosted server (url alias)
+            >>> # Direct mode against a standalone engine
             >>> client = RushDB(
-            ...     api_key="your_api_key",
-            ...     url="https://my-rushdb.company.com"
+            ...     api_key="local-token",
+            ...     direct=True,
+            ...     engine_url="http://127.0.0.1:3000",
             ... )
         """
         settings, raw_key = extract_mixed_properties_from_token(api_key)
 
         self.server_settings = (
-            {
-                "customDB": settings["customDB"],
-                "managedDB": settings["managedDB"],
-                "selfHosted": settings["selfHosted"],
-                "plan_type": settings["planType"],
-            }
+            {"selfHosted": settings["selfHosted"], "plan_type": settings["planType"]}
             if settings
             else None
         )
@@ -150,6 +166,16 @@ class RushDB:
             effective_url = effective_url.rstrip("/") + "/api/v1"
         self.base_url = effective_url.rstrip("/")
         self.api_key = api_key
+        self.direct = direct
+        self.engine: Optional[DirectEngine] = None
+        if direct:
+            if not engine_url:
+                raise ValueError("engine_url is required when direct=True")
+            self.engine = DirectEngine(
+                engine_url=engine_url,
+                token=engine_token or api_key,
+                scope=scope,
+            )
         self.records = RecordsAPI(self)
         self.properties = PropertiesAPI(self)
         self.labels = LabelsAPI(self)
@@ -157,6 +183,7 @@ class RushDB:
         self.query = QueryAPI(self)
         self.relationships = RelationsAPI(self)
         self.ai = AIAPI(self)
+        self.text_indexes = TextIndexesAPI(self)
         self.settings = _SettingsNamespace(self)
 
     def _make_request(
@@ -209,6 +236,11 @@ class RushDB:
             ...     params={"limit": 50, "skip": 0}
             ... )
         """
+        if self.engine is not None:
+            return direct_router.handle(
+                self.engine, method, path, data, headers, params
+            )
+
         # Ensure path starts with /
         if not path.startswith("/"):
             path = "/" + path
@@ -299,7 +331,12 @@ class RushDB:
             ...     return client
         """
         try:
-            self._make_request("GET", "/sdk/settings")
+            if self.engine is not None:
+                self.engine.execute(
+                    {"kind": "describe", "describe": {"kind": "buildInfo"}}
+                )
+            else:
+                self._make_request("GET", "/sdk/settings")
             return True
         except RushDBError:
             return False
