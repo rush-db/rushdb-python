@@ -37,14 +37,18 @@ pip install rushdb
 
 ---
 
-## RushDB Cloud or a standalone engine
+## RushDB Cloud or a self-hosted engine
 
 The SDK works with RushDB in one of two ways:
 
-| | RushDB Cloud (or a self-hosted RushDB platform) | A standalone engine (direct mode) |
+| | RushDB Cloud | Self-hosted RushDB engine (direct mode) |
 | --- | --- | --- |
-| What you run | nothing ([app.rushdb.com](https://app.rushdb.com)), or the platform's Docker image | one `rushdbd` binary |
+| What you run | nothing: the managed service at [app.rushdb.com](https://app.rushdb.com) | one `rushdbd` binary, on your own infrastructure |
 | Connect with | an API key | the engine URL and the engine token |
+
+The engine is what you can self-host. RushDB Cloud runs that engine for you and adds the dashboard,
+managed embeddings and the AI features (natural-language search, relationship-pattern suggestions),
+which exist only in RushDB Cloud.
 
 ```python
 from rushdb import RushDB
@@ -52,7 +56,7 @@ from rushdb import RushDB
 # RushDB Cloud
 db = RushDB("RUSHDB_API_KEY")
 
-# A standalone engine
+# A self-hosted engine
 db = RushDB(
     "ENGINE_TOKEN",
     direct=True,
@@ -63,7 +67,7 @@ db = RushDB(
 
 What each offers:
 
-| Feature | Cloud | Standalone |
+| Feature | Cloud | Self-hosted engine |
 | --- | :---: | :---: |
 | Records: create, read, update, set, upsert, delete, `find` with `where`, `orderBy`, `select`, `groupBy` | ✓ | ✓ |
 | Relationships: `attach`/`detach`, `relationships.create_many`/`delete_many`/`find` | ✓ | ✓ |
@@ -363,7 +367,7 @@ from rushdb import RushDB
 
 db = RushDB(
     'RUSHDB_API_KEY',
-    url='http://your-rushdb-server.com/api/v1',  # default: https://api.rushdb.com/api/v1
+    url='https://api.rushdb.com/api/v1',  # a different RushDB Cloud API endpoint; this is the default
     timeout=30,
 )
 ```

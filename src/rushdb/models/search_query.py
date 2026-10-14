@@ -11,9 +11,8 @@ class TraversalHopsRange(TypedDict, total=False):
     """Hop range for variable-length traversal.
 
     ``min`` defaults to 1 (2 inside a ``$cycle`` block). Omitting ``max``
-    requests unbounded traversal, which is only allowed on self-hosted
-    deployments and projects with a custom Neo4j instance; the shared cloud
-    connection caps ``max`` per deployment (default 25).
+    means up to 10 hops (the engine default); RushDB Cloud also caps ``max``
+    per deployment.
     """
 
     min: int

@@ -73,10 +73,11 @@ class RushDB:
         >>> # Initialize client with API key
         >>> client = RushDB(api_key="your_api_key_here")
         >>>
-        >>> # Use with custom server URL
+        >>> # A self-hosted RushDB engine (direct mode)
         >>> client = RushDB(
-        ...     api_key="your_api_key_here",
-        ...     base_url="https://your-rushdb-instance.com/api/v1"
+        ...     "engine_token_here",
+        ...     direct=True,
+        ...     engine_url="http://127.0.0.1:3000",
         ... )
         >>>
         >>> # Check connection
@@ -117,10 +118,11 @@ class RushDB:
             api_key (str): The API key for authenticating with the RushDB server.
                 This key should have appropriate permissions for the operations you
                 plan to perform.
-            base_url (Optional[str], optional): Base URL for the RushDB server
-                (e.g. ``"https://my-rushdb.company.com/api/v1"``). Deprecated alias
-                kept for backwards compatibility — prefer ``url``.
-            url (Optional[str], optional): Base URL for a self-hosted RushDB server.
+            base_url (Optional[str], optional): Deprecated alias of ``url``, kept
+                for backwards compatibility.
+            url (Optional[str], optional): Base URL of the RushDB Cloud API, to use
+                an endpoint other than the default. A self-hosted engine is reached
+                with ``direct=True`` and ``engine_url`` instead.
                 When provided without an ``/api/`` component the path ``/api/v1`` is
                 appended automatically.  Defaults to None, which uses
                 ``DEFAULT_BASE_URL``.
