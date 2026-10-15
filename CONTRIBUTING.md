@@ -15,7 +15,7 @@ When reporting an issue, include the following information:
 
 - Specify the version of RushDB you are using:
   - **Cloud**: Mention if you are using the latest cloud version.
-  - **Self-hosted engine (direct mode)**: Provide the `rushdbd` version and the SDK version.
+  - **Self-hosted engine (direct mode)**: Provide the engine version (`rushdb --version`) and the SDK version.
 
 3. **Steps to Reproduce**
 

@@ -43,7 +43,7 @@ The SDK works with RushDB in one of two ways:
 
 | | RushDB Cloud | Self-hosted RushDB engine (direct mode) |
 | --- | --- | --- |
-| What you run | nothing: the managed service at [app.rushdb.com](https://app.rushdb.com) | one `rushdbd` binary, on your own infrastructure |
+| What you run | nothing: the managed service at [app.rushdb.com](https://app.rushdb.com) | one `rushdb` binary, on your own infrastructure |
 | Connect with | an API key | the engine URL and the engine token |
 
 The engine is what you can self-host. RushDB Cloud runs that engine for you and adds the dashboard,

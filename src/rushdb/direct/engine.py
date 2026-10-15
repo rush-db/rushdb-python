@@ -1,6 +1,6 @@
 """Direct engine transport for the RushDB Python SDK.
 
-Executes protocol operations against a standalone ``rushdbd``
+Executes protocol operations against a standalone ``rushdb``
 (``POST /protocol/v1/execute``) over HTTP. This is the SDK's "direct mode":
 no RushDB Cloud. The tenant scope (multitenant engines) is the
 ``X-RushDB-Tenant`` header and auth is the engine token. The REST calls of the
@@ -16,7 +16,7 @@ from ..common import RushDBError
 
 
 class DirectEngine:
-    """Client for a standalone ``rushdbd`` protocol endpoint.
+    """Client for a standalone ``rushdb`` protocol endpoint.
 
     Args:
         engine_url (str): Base URL of the standalone engine, e.g.

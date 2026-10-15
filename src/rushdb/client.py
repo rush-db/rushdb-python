@@ -127,7 +127,7 @@ class RushDB:
                 appended automatically.  Defaults to None, which uses
                 ``DEFAULT_BASE_URL``.
             direct (bool, optional): When ``True``, talks to a standalone
-                ``rushdbd`` engine instead of RushDB Cloud. Every method is
+                ``rushdb`` engine instead of RushDB Cloud. Every method is
                 answered from the engine; the methods in
                 ``rushdb.CLOUD_ONLY_METHODS`` raise ``CloudOnlyError`` before
                 sending anything, and no request ever goes to RushDB Cloud. The

@@ -1,9 +1,9 @@
 """Direct mode against a real standalone engine. Runs only when
 ``RUSHDB_TEST_ENGINE_URL`` (and ``RUSHDB_TEST_ENGINE_TOKEN``, default
-``local-token``) point at a single-tenant ``rushdbd`` started with
+``local-token``) point at a single-tenant ``rushdb`` started with
 ``--languages cypher``::
 
-    rushdbd --data-dir /tmp/rushdb-test --port 3877 --languages cypher
+    rushdb serve --data-dir /tmp/rushdb-test --port 3877 --languages cypher
     RUSHDB_TEST_ENGINE_URL=http://127.0.0.1:3877 pytest tests/test_direct_mode_live.py
 """
 

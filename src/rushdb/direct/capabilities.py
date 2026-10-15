@@ -2,7 +2,7 @@
 
 One list: the direct-mode router refuses these with ``CloudOnlyError``, and
 the docs mark them. Everything else the SDK offers runs against a standalone
-``rushdbd`` too.
+``rushdb`` too.
 """
 
 from typing import Dict
