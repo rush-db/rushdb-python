@@ -5,11 +5,10 @@ from .base import BaseAPI
 
 
 class QueryAPI(BaseAPI):
-    """API client for executing raw Cypher queries (cloud-only).
+    """API client for executing raw openCypher queries.
 
-    This endpoint is only available when using the RushDB managed cloud
-    service or when your project is connected to a custom database through
-    RushDB Cloud. It will not function for self-hosted or local-only deployments.
+    Works on RushDB Cloud and on a self-hosted RushDB engine in direct mode
+    (the engine must be started with ``--languages cypher``).
 
     Example:
         >>> from rushdb import RushDB

@@ -39,6 +39,13 @@ def _is_flat(obj: Any) -> bool:
     )
 
 
+def _returned_records(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The records an import returned: a list when ``returnResult`` asked for
+    them, otherwise ``data`` is a summary (``{message, count}``) or ``True``."""
+    data = response.get("data")
+    return data if isinstance(data, list) else []
+
+
 class RecordsAPI(BaseAPI):
     """API client for managing records in RushDB.
 
@@ -124,6 +131,7 @@ class RecordsAPI(BaseAPI):
         target: RecordTarget,
         data: Dict[str, Any],
         transaction: Optional[Transaction] = None,
+        label: Optional[str] = None,
     ) -> Dict[str, str]:
         """Partially update a record with new or modified fields.
 
@@ -147,8 +155,11 @@ class RecordsAPI(BaseAPI):
         record_id = pick_record_id(target)
         headers = Transaction._build_transaction_header(transaction)
 
+        payload = data.copy()
+        if label is not None:
+            payload["label"] = label
         return self.client._make_request(
-            "PATCH", f"/records/{record_id}", data, headers
+            "PATCH", f"/records/{record_id}", payload, headers
         )
 
     def create(
@@ -286,7 +297,7 @@ class RecordsAPI(BaseAPI):
         response = self.client._make_request(
             "POST", "/records/import/json", payload, headers
         )
-        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        records = [Record(self.client, r) for r in _returned_records(response)]
         return RecordSearchResult(
             data=records, total=response.get("total", len(records)), client=self.client
         )
@@ -358,7 +369,7 @@ class RecordsAPI(BaseAPI):
         response = self.client._make_request(
             "POST", "/records/import/json", payload, headers
         )
-        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        records = [Record(self.client, r) for r in _returned_records(response)]
         return RecordSearchResult(
             data=records, total=response.get("total", len(records)), client=self.client
         )
@@ -484,7 +495,9 @@ class RecordsAPI(BaseAPI):
 
         Removes existing relationships between a source record and one or more target records.
         The source and target can be specified using various formats including IDs,
-        record dictionaries, or Record objects.
+        record dictionaries, or Record objects. Without ``typeOrTypes`` in ``options``,
+        relationships of every type are removed; without ``direction``, relationships
+        pointing either way are removed.
 
         Args:
             source (RecordTarget): The source record to detach targets from.
@@ -492,10 +505,11 @@ class RecordsAPI(BaseAPI):
             target (RelationTarget): The target record(s) to detach from the source.
                 Accepts a single or list of: UUID string, ``Record`` instance, or
                 dict with ``"__id"``.
-            options (Optional[RelationshipDetachOptions], optional): Additional options for the detach operation.
-                Defaults to None.
-            transaction (Optional[Transaction], optional): Transaction context for the operation.
-                If provided, the operation will be part of the transaction. Defaults to None.
+            options (Optional[RelationshipDetachOptions], optional): ``typeOrTypes`` and
+                ``direction`` to narrow what is removed. Defaults to None.
+            transaction (Optional[Transaction], optional): Not supported: the engine cannot
+                stage a detach, so a request inside a transaction is refused (and, on
+                RushDB Cloud, rolls the transaction back). Defaults to None.
 
         Returns:
             Dict[str, str]: Response from the server containing operation status.
@@ -643,9 +657,12 @@ class RecordsAPI(BaseAPI):
         if isinstance(target, list):
             ids = self._extract_target_ids(target)
             response = self.client._make_request(
-                "POST", "/records", {"ids": ids}, headers
+                "POST",
+                "/records/search",
+                {"where": {"$id": {"$in": ids}}, "limit": len(ids)},
+                headers,
             )
-            records = [Record(self.client, r) for r in (response.get("data") or [])]
+            records = [Record(self.client, r) for r in _returned_records(response)]
             return RecordSearchResult(
                 data=records,
                 total=response.get("total", len(records)),
@@ -663,30 +680,38 @@ class RecordsAPI(BaseAPI):
         record_id: Optional[RecordTarget] = None,
         transaction: Optional[Transaction] = None,
     ) -> RecordSearchResult:
-        try:
-            headers = Transaction._build_transaction_header(transaction)
+        """Search records.
 
-            resolved_id = pick_record_id(record_id) if record_id is not None else None
-            path = (
-                f"/records/{resolved_id}/search" if resolved_id else "/records/search"
-            )
-            response = self.client._make_request(
-                "POST",
-                path,
-                data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
-                headers=headers,
-            )
+        Args:
+            search_query: Labels, ``where``, ordering, pagination, ``select`` and
+                ``groupBy`` to search with; omitted, every record matches.
+            record_id: Search only the records directly related to this record.
+            transaction: Optional transaction context for the operation.
 
-            records = [
-                Record(self.client, record) for record in response.get("data", [])
-            ]
-            total = response.get("total", 0)
+        Returns:
+            RecordSearchResult: The matching records and their total.
 
-            return RecordSearchResult(
-                data=records, total=total, search_query=search_query, client=self.client
-            )
-        except Exception:
-            return RecordSearchResult(data=[], total=0, client=self.client)
+        Raises:
+            RushDBError: When the request fails (authentication, connection, an
+                invalid query). Failures are never reported as an empty result.
+        """
+        headers = Transaction._build_transaction_header(transaction)
+
+        resolved_id = pick_record_id(record_id) if record_id is not None else None
+        path = f"/records/{resolved_id}/search" if resolved_id else "/records/search"
+        response = self.client._make_request(
+            "POST",
+            path,
+            data=typing.cast(typing.Dict[str, typing.Any], search_query or {}),
+            headers=headers,
+        )
+
+        records = [Record(self.client, record) for record in response.get("data", [])]
+        total = response.get("total", 0)
+
+        return RecordSearchResult(
+            data=records, total=total, search_query=search_query, client=self.client
+        )
 
     def vector_search(
         self,
@@ -712,11 +737,21 @@ class RecordsAPI(BaseAPI):
                 - ``limit`` (int, optional): Maximum number of results.
                 - ``skip`` (int, optional): Number of results to skip.
                 - ``topK`` (int, optional): Candidate count in direct vector mode.
+                - ``text`` (dict, optional): Makes the search hybrid: a BM25 keyword
+                  leg (``query``, and optionally ``index``, ``property``,
+                  ``allTerms``, ``phrase``, ``weight``, ``prefetchLimit``) fused with
+                  the vector leg.
+                - ``weight`` / ``prefetchLimit`` (optional, hybrid only): the vector
+                  leg's share of the fused score (default 1) and the hits it ranks
+                  before fusion (1–10,000).
+                - ``fusion`` (``"rrf"`` or ``"dbsf"``, optional, hybrid only): how
+                  the legs combine (default ``"rrf"``); ``rrfK`` (default 60) is the
+                  RRF smoothing constant.
             transaction: Optional transaction context.
 
         Returns:
             RecordSearchResult: Matching records ranked by similarity. Each
-            record may include ``__score``.
+            record may include ``__score``; ``meta`` reports how the search ran.
         """
         headers = Transaction._build_transaction_header(transaction)
         response = self.client._make_request("POST", "/ai/search", params, headers)
@@ -726,6 +761,50 @@ class RecordsAPI(BaseAPI):
             total=response.get("total", len(records)),
             search_query=typing.cast(SearchQuery, params),
             client=self.client,
+            meta=response.get("meta"),
+        )
+
+    def text_search(
+        self,
+        params: Dict[str, Any],
+        transaction: Optional[Union[Transaction, str]] = None,
+    ) -> RecordSearchResult:
+        """Keyword (BM25) search over a text index.
+
+        Returns the records matching ``query``, best first (``__score``), among
+        those ``labels`` and ``where`` select. Mirrors the TypeScript SDK
+        ``db.records.textSearch``.
+
+        Args:
+            params: Keyword search parameters:
+
+                - ``query`` (str): Keywords; ``"a phrase"``, ``-excluded`` and
+                  ``+required`` follow the query syntax.
+                - ``index`` (str, optional): The text index, by name; otherwise the
+                  one ready text index of the first label.
+                - ``property`` (str, optional): Narrows the choice of text index to
+                  one over this property.
+                - ``labels`` (list[str], optional), ``where`` (dict, optional):
+                  Filters applied before ranking.
+                - ``skip`` (int, optional), ``limit`` (int, optional, default 10).
+                - ``allTerms`` (bool, optional): Every keyword must match.
+                - ``phrase`` (bool, optional): Match the keywords as one phrase.
+            transaction: Optional transaction context.
+
+        Returns:
+            RecordSearchResult: The page of matches; ``total`` counts every match,
+            and ``meta["textSearch"]`` has ``matches`` and ``pending`` (changes the
+            index had not applied yet).
+        """
+        headers = Transaction._build_transaction_header(transaction)
+        response = self.client._make_request("POST", "/search/text", params, headers)
+        records = [Record(self.client, item) for item in response.get("data", [])]
+        return RecordSearchResult(
+            data=records,
+            total=response.get("total", len(records)),
+            search_query=typing.cast(SearchQuery, params),
+            client=self.client,
+            meta=response.get("meta"),
         )
 
     def find_one(
@@ -799,11 +878,11 @@ class RecordsAPI(BaseAPI):
         headers = Transaction._build_transaction_header(transaction)
         response = self.client._make_request(
             "POST",
-            "/records/export",
+            "/records/export/csv",
             typing.cast(Dict[str, Any], search_query or {}),
             headers,
         )
-        return response
+        return (response.get("data") or {}).get("fileContent", "")
 
     def import_csv(
         self,
@@ -886,7 +965,7 @@ class RecordsAPI(BaseAPI):
         response = self.client._make_request(
             "POST", "/records/import/csv", payload, headers
         )
-        records = [Record(self.client, r) for r in (response.get("data") or [])]
+        records = [Record(self.client, r) for r in _returned_records(response)]
         return RecordSearchResult(
             data=records, total=response.get("total", len(records)), client=self.client
         )

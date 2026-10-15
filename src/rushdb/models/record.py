@@ -78,10 +78,13 @@ class Record:
         )
 
     def update(
-        self, data: Dict[str, Any], transaction: Optional[Transaction] = None
+        self,
+        data: Dict[str, Any],
+        transaction: Optional[Transaction] = None,
+        label: Optional[str] = None,
     ) -> Dict[str, str]:
         """Update record data through API request."""
-        return self._client.records.update(self.id, data, transaction)
+        return self._client.records.update(self.id, data, transaction, label)
 
     def attach(
         self,

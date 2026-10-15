@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from ..models.transaction import Transaction
 from .base import BaseAPI
@@ -41,7 +41,7 @@ class TransactionsAPI(BaseAPI):
         ...     transaction.rollback()  # Undoes all changes
     """
 
-    def begin(self, ttl: Optional[int] = None) -> Transaction:
+    def begin(self, ttl: Optional[int] = None, autocommit: bool = False) -> Transaction:
         """Begin a new database transaction.
 
         Creates a new transaction that can be used to group multiple database
@@ -53,6 +53,7 @@ class TransactionsAPI(BaseAPI):
                 After this time, the transaction will automatically expire and be rolled back.
                 If None, defaults to 5000ms (5 seconds). Values above the server-side cap
                 (60 seconds) are clamped to it. Defaults to None.
+            autocommit (bool): Commit staged writes when the TTL expires. Defaults to False.
 
         Returns:
             Transaction: A Transaction object that can be used with other API operations.
@@ -78,7 +79,10 @@ class TransactionsAPI(BaseAPI):
             >>> except Exception:
             ...     transaction.rollback()
         """
-        response = self.client._make_request("POST", "/tx", {"ttl": ttl or 5000})
+        payload: Dict[str, Any] = {"autocommit": autocommit}
+        if ttl is not None:
+            payload["ttl"] = ttl
+        response = self.client._make_request("POST", "/tx", payload)
         return Transaction(self.client, response.get("data")["id"])
 
     def _commit(self, transaction_id: str) -> None:
