@@ -43,7 +43,7 @@ jobs:
         run: |
           uv run pytest
 
-  publish:
+  build:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     needs: test
@@ -61,13 +61,28 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install dependencies
-        run: |
-          uv sync --dev
+      - name: Build distributions
+        run: uv build
 
-      - name: Build and publish
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          uv build
-          uv publish
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
