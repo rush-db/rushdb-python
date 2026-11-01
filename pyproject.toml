@@ -1,7 +1,7 @@
 [project]
 name = "rushdb"
 version = "3.0.0"
-description = "RushDB Python SDK — memory layer for AI agents and modern apps"
+description = "RushDB SDK for Python: the client for RushDB, the database for AI (RushDB Cloud or self-hosted)"
 authors = [
     {name = "RushDB Team", email = "hi@rushdb.com"}
 ]
@@ -11,41 +11,18 @@ requires-python = ">=3.10"
 keywords = [
     "rushdb",
     "database",
-    "graph database",
-    "graph-database",
-    "ai memory",
-    "ai-memory",
-    "agent memory",
-    "agent-memory",
-    "memory layer",
-    "memory-layer",
-    "ai agents",
+    "database-for-ai",
     "ai-agents",
-    "llm memory",
-    "llm-memory",
-    "mcp",
-    "vector search",
+    "graph-database",
+    "sql",
+    "cypher",
     "vector-search",
-    "rag",
-    "retrieval augmented generation",
-    "embedding",
-    "embeddings",
-    "knowledge graph",
-    "knowledge-graph",
-    "json normalization",
-    "json-normalization",
-    "schema-less",
-    "schemaless",
-    "no-schema",
+    "full-text-search",
+    "hybrid-search",
+    "mcp",
     "self-hosted",
-    "cloud",
-    "rest api",
-    "rest-api",
-    "graph",
-    "relationships",
-    "persistence",
-    "rush-db",
-    "rush db"
+    "rag",
+    "agent-memory"
 ]
 dependencies = []
 

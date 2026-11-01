@@ -4,16 +4,15 @@
 
 # RushDB — Python SDK
 
-### The memory layer for AI agents and apps.
+### RushDB — the database for AI
 
-Push any JSON. Get graph relationships and vector search — automatically.
-No schema. No pipeline. No glue code.
+One database for your records, their relationships, and search over them.
 
 ![PyPI - Version](https://img.shields.io/pypi/v/rushdb)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/rushdb)
 ![PyPI - License](https://img.shields.io/pypi/l/rushdb)
 
-[📖 Documentation](https://docs.rushdb.com/python-sdk/introduction) • [🌐 Website](https://rushdb.com) • [☁️ Cloud](https://app.rushdb.com)
+[📖 Documentation](https://docs.rushdb.com/3.x/connect/sdks/) • [🌐 Website](https://rushdb.com) • [☁️ Cloud](https://app.rushdb.com)
 
 </div>
 
@@ -34,6 +33,16 @@ Works with LangChain, CrewAI, AutoGen, or any Python AI framework.
 ```bash
 pip install rushdb
 ```
+
+---
+
+## Compatibility
+
+| Package | RushDB 3.x and RushDB Cloud | RushDB 2.x (legacy) |
+|---|---|---|
+| `@rushdb/javascript-sdk` | 3.x | 2.11.0: `npm i @rushdb/javascript-sdk@2` |
+| `rushdb` (PyPI) | 3.x | 2.10.0: `pip install "rushdb<3"` |
+| `@rushdb/mcp-server` | 3.x | 2.13.0: `npx @rushdb/mcp-server@2` |
 
 ---
 
@@ -376,7 +385,7 @@ db = RushDB(
 
 ## Documentation
 
-[docs.rushdb.com/python-sdk](https://docs.rushdb.com/python-sdk/introduction) — full API reference, vector search, aggregations, and more.
+[docs.rushdb.com/3.x/connect/sdks](https://docs.rushdb.com/3.x/connect/sdks/) and the [Python reference](https://docs.rushdb.com/3.x/learn/reference/python/) — full API reference, vector search, aggregations, and more.
 
 ---
 
