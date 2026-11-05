@@ -32,6 +32,9 @@ class SearchResult(Generic[T]):
         client: Optional["RushDB"] = None,
         warnings: Optional[List[str]] = None,
         meta: Optional[Dict[str, Any]] = None,
+        sql: Optional[str] = None,
+        name: Optional[str] = None,
+        sql_page: Optional[Dict[str, int]] = None,
     ):
         """
         Initialize search result.
@@ -44,6 +47,10 @@ class SearchResult(Generic[T]):
             warnings: Optional warnings returned by AI-assisted query generation
             meta: How a vector, keyword or hybrid search ran (``vectorSearch``,
                 ``textSearch``, ``fusion``)
+            sql: For Smart search, the SQL statement that produced this result
+            name: For Smart search, a short title of the query
+            sql_page: For Smart search, the page (``skip``, ``limit``) of the
+                statement's rows this result holds
         """
         self._data = data
         self._total = total or len(data)
@@ -51,6 +58,9 @@ class SearchResult(Generic[T]):
         self._client = client
         self._warnings = warnings or []
         self._meta = meta or {}
+        self._sql = sql
+        self._name = name
+        self._sql_page = sql_page or {"skip": 0, "limit": 100}
 
     @property
     def data(self) -> List[T]:
@@ -66,6 +76,16 @@ class SearchResult(Generic[T]):
     def search_query(self) -> SearchQuery:
         """Get the search query used to generate this result."""
         return self._search_query
+
+    @property
+    def sql(self) -> Optional[str]:
+        """For Smart search: the SQL statement that produced this result."""
+        return self._sql
+
+    @property
+    def name(self) -> Optional[str]:
+        """For Smart search: a short title of the query."""
+        return self._name
 
     @property
     def warnings(self) -> List[str]:
@@ -87,11 +107,15 @@ class SearchResult(Generic[T]):
     @property
     def skip(self) -> int:
         """Get the number of records that were skipped."""
+        if self._sql:
+            return self._sql_page["skip"]
         return self._search_query.get("skip") or 0
 
     @property
     def limit(self) -> Optional[int]:
         """Get the limit that was applied to the search."""
+        if self._sql:
+            return self._sql_page["limit"]
         return self._search_query.get("limit")
 
     def __len__(self) -> int:
@@ -119,12 +143,14 @@ class SearchResult(Generic[T]):
         Return the result in a standardized dictionary format.
 
         Returns:
-            Dict with keys: total, data, search_query
+            Dict with keys: total, data, search_query, sql, name, warnings
         """
         return {
             "total": self.total,
             "data": self.data,
             "search_query": self.search_query,
+            "sql": self.sql,
+            "name": self.name,
             "warnings": self.warnings,
         }
 
@@ -164,7 +190,8 @@ class SearchResult(Generic[T]):
         return self._get_client().records.delete_by_id(ids, transaction)
 
     def next(self, preserve_data: bool = False) -> "SearchResult":
-        """Fetch the next page of results.
+        """Fetch the next page of results: of the original search query, or of
+        the SQL statement for a Smart search result.
 
         Args:
             preserve_data: If True, appends new records to this instance's data
@@ -174,8 +201,21 @@ class SearchResult(Generic[T]):
             SearchResult with the next page (or self when preserve_data=True)
 
         Raises:
-            RuntimeError: If no search_query was provided at construction
+            RuntimeError: If neither a search_query nor a sql statement was provided
         """
+        if self._sql:
+            next_page = {
+                "skip": self._sql_page["skip"] + self._sql_page["limit"],
+                "limit": self._sql_page["limit"],
+            }
+            result = self._get_client().ai.run_sql(self._sql, **next_page)
+            if preserve_data:
+                self._data = self._data + result._data  # type: ignore[operator]
+                self._total = result._total
+                self._sql_page = next_page
+                return self
+            result._name = self._name
+            return result
         if not self._search_query:
             raise RuntimeError(
                 "SearchResult: cannot paginate — no search_query was provided."

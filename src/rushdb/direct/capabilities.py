@@ -10,7 +10,8 @@ from typing import Dict
 _PATTERNS = "relationship-pattern suggestions are produced and stored by the platform"
 
 CLOUD_ONLY_METHODS: Dict[str, str] = {
-    "ai.search": "natural-language search turns the prompt into a query with an LLM",
+    "ai.search": "natural-language search turns the prompt into a SQL statement with an LLM",
+    "ai.run_sql": "Smart search SQL runs on the platform, which loads the full records the statement selects",
     "relationships.patterns.list": _PATTERNS,
     "relationships.patterns.analyze": _PATTERNS,
     "relationships.patterns.approve": _PATTERNS,

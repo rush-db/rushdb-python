@@ -271,6 +271,7 @@ EVERY_METHOD = {
         "book-vec", {"items": [{"recordId": RECORD["id"], "vector": [1, 0, 0]}]}
     ),
     "ai.search": lambda db: db.ai.search("books about deserts"),
+    "ai.run_sql": lambda db: db.ai.run_sql('SELECT __id FROM "Book"'),
     "settings.get": lambda db: db.settings.get(),
 }
 

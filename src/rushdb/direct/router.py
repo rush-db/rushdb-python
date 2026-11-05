@@ -1372,7 +1372,8 @@ _ROUTES: List[Tuple[str, "re.Pattern[str]", Callable[[_Request], Body]]] = [
     ),
     ("DELETE", re.compile(rf"^/text-indexes/{_ID}$"), _drop_text_index),
     ("POST", re.compile(r"^/search/text$"), _text_search),
-    ("POST", re.compile(r"^/ai/search-query$"), _cloud_only("ai.search")),
+    ("POST", re.compile(r"^/ai/sql-search$"), _cloud_only("ai.search")),
+    ("POST", re.compile(r"^/records/sql-search$"), _cloud_only("ai.run_sql")),
     ("POST", re.compile(r"^/ai/search$"), _vector_search),
     (
         "GET",

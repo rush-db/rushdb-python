@@ -88,7 +88,7 @@ What each offers:
 | Keyword (BM25) search (`records.text_search`), text indexes (`text_indexes.*`), hybrid search | ✓ | ✓ |
 | Transactions | ✓ | record creates, updates, sets, deletes by id, attaches and imports are staged; other writes refuse a transaction |
 | Managed embeddings: managed indexes, `records.vector_search` by text `query` | ✓ | — |
-| Natural-language search (`ai.search`) | ✓ | — |
+| Natural-language search on SQL (`ai.search`, `ai.run_sql`) | ✓ | — |
 | Relationship-pattern suggestions (`relationships.patterns.*`) | ✓ | — |
 | Project settings (`settings.get`), dashboard, team access | ✓ | — |
 
@@ -266,6 +266,7 @@ if result:
 | `total`        | `int`          | Total matching records in the database      |
 | `has_more`     | `bool`         | Whether more records exist beyond this page |
 | `search_query` | `dict`         | The query that produced this result         |
+| `sql`          | `str`          | For Smart search, the SQL statement it ran  |
 
 ---
 
@@ -288,12 +289,20 @@ for record in results:
 ```
 
 Use `db.ai.search()` when you want RushDB to turn a natural-language request
-into a SearchQuery and execute it:
+into one read-only SQL statement over your schema and run it (RushDB Cloud):
 
 ```python
 results = db.ai.search('Find active memories about Q4 results for agent-42')
-print(results.search_query)
+print(results.name)  # a short title, e.g. to save the query under
+print(results.sql)   # the statement it ran
+more = results.next()  # the next page of the statement's rows
+
+# Run a statement directly, e.g. a saved one:
+rows = db.ai.run_sql('SELECT agent_id, count(*) AS memories FROM "MEMORY" GROUP BY agent_id')
 ```
+
+Rows that select a record's `__id` come back as full records; aggregates come
+back as plain rows.
 
 `db.ai.search({...})` still works as a deprecated vector-search alias, but new
 code should use `db.records.vector_search({...})`.
