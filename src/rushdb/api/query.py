@@ -8,7 +8,7 @@ class QueryAPI(BaseAPI):
     """API client for executing raw openCypher queries.
 
     Works on RushDB Cloud and on a self-hosted RushDB engine in direct mode
-    (the engine must be started with ``--languages cypher``).
+    (the engine must be started with ``--languages cypher,sql``).
 
     Example:
         >>> from rushdb import RushDB

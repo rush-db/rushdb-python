@@ -43,13 +43,14 @@ class TestVectorAndSmartSearch(unittest.TestCase):
         self.assertEqual(result[0].get("title"), "Alpha")
         self.assertEqual(result[0].score, 0.91)
 
-    def test_ai_search_prompt_generates_and_executes_search_query(self):
+    def test_ai_search_prompt_generates_and_runs_sql(self):
         client = Mock()
         client._make_request.side_effect = [
             {
                 "success": True,
                 "data": {
-                    "searchQuery": {"labels": ["Pilot"], "where": {"ship": "Falcon"}},
+                    "sql": 'SELECT __id FROM "Pilot" WHERE "ship" = \'Falcon\'',
+                    "name": "Falcon pilots",
                     "warnings": ["ambiguous ship name"],
                 },
             },
@@ -60,38 +61,41 @@ class TestVectorAndSmartSearch(unittest.TestCase):
             },
         ]
 
-        result = AIAPI(client).search(
-            "Who are piloting Falcon?",
-            current_query={"labels": ["Pilot"]},
-            transaction="tx_123",
-        )
+        result = AIAPI(client).search("Who are piloting Falcon?", limit=10)
 
         self.assertEqual(
             client._make_request.call_args_list[0].args,
-            (
-                "POST",
-                "/ai/search-query",
-                {
-                    "prompt": "Who are piloting Falcon?",
-                    "currentQuery": {"labels": ["Pilot"]},
-                },
-                {"X-Transaction-Id": "tx_123"},
-            ),
+            ("POST", "/ai/sql-search", {"prompt": "Who are piloting Falcon?"}),
         )
+        sql = 'SELECT __id FROM "Pilot" WHERE "ship" = \'Falcon\''
+        self.assertEqual(
+            client._make_request.call_args_list[1].args,
+            ("POST", "/records/sql-search", {"sql": sql, "skip": 0, "limit": 10}),
+        )
+        self.assertEqual(result.sql, sql)
+        self.assertEqual(result.name, "Falcon pilots")
+        self.assertEqual(result.warnings, ["ambiguous ship name"])
+        self.assertEqual(result.search_query, {})
+        self.assertEqual(result[0].get("name"), "Han")
+
+    def test_smart_search_result_pages_through_its_sql(self):
+        client = Mock()
+        client._make_request.return_value = {"success": True, "total": 3, "data": []}
+        client.ai = AIAPI(client)
+
+        first = client.ai.run_sql('SELECT __id FROM "Pilot"', limit=2)
+        self.assertEqual((first.skip, first.limit), (0, 2))
+        second = first.next()
+
         self.assertEqual(
             client._make_request.call_args_list[1].args,
             (
                 "POST",
-                "/records/search",
-                {"labels": ["Pilot"], "where": {"ship": "Falcon"}},
-                {"X-Transaction-Id": "tx_123"},
+                "/records/sql-search",
+                {"sql": 'SELECT __id FROM "Pilot"', "skip": 2, "limit": 2},
             ),
         )
-        self.assertEqual(
-            result.search_query, {"labels": ["Pilot"], "where": {"ship": "Falcon"}}
-        )
-        self.assertEqual(result.warnings, ["ambiguous ship name"])
-        self.assertEqual(result[0].get("name"), "Han")
+        self.assertEqual((second.skip, second.limit, second.sql), (2, 2, first.sql))
 
     def test_ai_search_dict_is_deprecated_vector_search_alias(self):
         client = Mock()

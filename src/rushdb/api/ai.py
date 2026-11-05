@@ -5,12 +5,11 @@ and embedding index management.
 """
 
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from ..models.api_response import ApiResponse
 from ..models.record import Record
 from ..models.result import RecordSearchResult
-from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
@@ -225,14 +224,18 @@ class AIAPI(BaseAPI):
     def search(
         self,
         prompt: Union[str, Dict[str, Any]],
-        current_query: Optional[SearchQuery] = None,
+        skip: Optional[int] = None,
+        limit: Optional[int] = None,
         transaction: Optional[Union[Transaction, str]] = None,
     ) -> RecordSearchResult:
         """Perform AI-assisted smart search from natural language.
 
-        RushDB converts ``prompt`` into a SearchQuery using the project schema,
-        executes it, and returns matching records with the generated query
-        attached to ``result.search_query``.
+        RushDB turns ``prompt`` into one read-only SQL statement over the
+        project's schema, runs it, and returns the result with the statement
+        as ``result.sql``, a short title as ``result.name`` and any generation
+        warnings as ``result.warnings``. Rows that select a record's ``__id``
+        come back as full records; aggregates come back as plain rows.
+        ``result.next()`` pages through the statement.
 
         Use ``db.records.vector_search({...})`` for direct vector similarity
         over embedding indexes.
@@ -240,14 +243,12 @@ class AIAPI(BaseAPI):
         Args:
             prompt: Natural-language search request. Passing a dict is
                 deprecated and delegates to ``db.records.vector_search``.
-            current_query: Optional current SearchQuery context from a
-                dashboard/query-builder session.
-            transaction: Optional transaction context.
+            skip: Rows to skip (default 0).
+            limit: Rows to return, at most 1000 (default 100).
+            transaction: Only used by the deprecated dict form.
 
         Returns:
-            RecordSearchResult: Matching records. The generated SearchQuery is
-            available as ``result.search_query`` and server warnings as
-            ``result.warnings``.
+            RecordSearchResult: The statement's first page of rows.
         """
         if isinstance(prompt, dict):
             warnings.warn(
@@ -258,24 +259,45 @@ class AIAPI(BaseAPI):
             )
             return self.client.records.vector_search(prompt, transaction=transaction)
 
-        headers = Transaction._build_transaction_header(transaction)
         generated = self.client._make_request(
-            "POST",
-            "/ai/search-query",
-            {"prompt": prompt, "currentQuery": current_query},
-            headers,
+            "POST", "/ai/sql-search", {"prompt": prompt}
         )
         generated_data = generated.get("data") or {}
-        search_query = generated_data.get("searchQuery") or {}
+        result = self.run_sql(generated_data.get("sql", ""), skip=skip, limit=limit)
+        result._name = generated_data.get("name")
+        result._warnings = generated_data.get("warnings") or []
+        return result
 
+    def run_sql(
+        self,
+        sql: str,
+        skip: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> RecordSearchResult:
+        """Run one read-only SQL statement over the project's schema, as Smart
+        search does: a statement from ``ai.search`` (its ``sql``), or one
+        written by hand. Labels are tables; relationship types are
+        ``rushdb_edges.<type>`` tables.
+
+        Args:
+            sql: One read-only SELECT statement.
+            skip: Rows to skip (default 0).
+            limit: Rows to return, at most 1000 (default 100).
+
+        Returns:
+            RecordSearchResult: Full records for rows that select a record's
+            ``__id``, otherwise the rows themselves; ``result.sql`` holds the
+            statement and ``result.next()`` fetches the following page.
+        """
+        page = {"skip": skip or 0, "limit": limit or 100}
         response = self.client._make_request(
-            "POST", "/records/search", search_query, headers
+            "POST", "/records/sql-search", {"sql": sql, **page}
         )
         records = [Record(self.client, item) for item in response.get("data", [])]
         return RecordSearchResult(
             data=records,
             total=response.get("total", len(records)),
-            search_query=cast(SearchQuery, search_query),
             client=self.client,
-            warnings=generated_data.get("warnings") or [],
+            sql=sql,
+            sql_page=page,
         )
