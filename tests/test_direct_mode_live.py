@@ -85,6 +85,27 @@ def test_relationships(db):
     )
     assert found.total == 1
 
+    edge = found.data[0]
+    result = db.relationships.update(
+        edge["sourceId"],
+        edge["targetId"],
+        type="AUTHORED",
+        set={"year": 1965, "role": "author", "since": "1965-08-01T10:30:00.000Z"},
+        types={"since": "datetime"},
+    )
+    assert result["data"]["updated"] == 1
+    db.relationships.update(
+        edge["sourceId"], edge["targetId"], type="AUTHORED", unset=["role"]
+    )
+    updated = db.relationships.find(
+        {"where": {"type": "AUTHORED"}, "source": {"labels": [AUTHOR]}}
+    )
+    assert updated.data[0].get("properties") == {
+        "year": 1965,
+        "since": "1965-08-01T10:30:00.000Z",
+    }
+    assert updated.data[0].get("propertyTypes", {}).get("since") == "datetime"
+
 
 def test_labels_properties_schema(db):
     assert db.labels.find({})["data"][BOOK] >= 3

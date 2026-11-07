@@ -79,7 +79,7 @@ What each offers:
 | Feature | Cloud | Self-hosted engine |
 | --- | :---: | :---: |
 | Records: create, read, update, set, upsert, delete, `find` with `where`, `orderBy`, `select`, `groupBy` | ✓ | ✓ |
-| Relationships: `attach`/`detach`, `relationships.create_many`/`delete_many`/`find` | ✓ | ✓ |
+| Relationships: `attach`/`detach`, `relationships.create_many`/`delete_many`/`find`/`update` | ✓ | ✓ |
 | Labels, properties, property values | ✓ | ✓ |
 | Import JSON and CSV, export CSV | ✓ | ✓ |
 | External vector indexes; vector search with a `queryVector` you supply | ✓ | ✓ |
@@ -213,6 +213,13 @@ relationships = db.relationships.find({
     'target': {'labels': ['COMPANY']},
     'where': {'type': 'WORKS_AT', 'source': 'profile'},
 })
+
+# Change properties on existing relationships (RushDB 3.0.4+): set writes, unset removes
+db.relationships.update(user, company, type='WORKS_AT', set={'source': 'hr'}, unset=['legacy'])
+# types marks values JSON can't type: 'datetime' stores an ISO string as a datetime
+db.relationships.update(
+    user, company, type='WORKS_AT', set={'since': '2024-03-01'}, types={'since': 'datetime'}
+)
 ```
 
 ---
