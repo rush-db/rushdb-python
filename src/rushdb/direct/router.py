@@ -122,20 +122,18 @@ def _sdk_records(records: Optional[List[Body]]) -> List[Body]:
     return [to_sdk_record(record) or {} for record in records or []]
 
 
-_RECORD_KEYS = {"label", "options", "vectors", "data", "properties"}
-
-
 def _record_properties(body: Body) -> Body:
-    """A write's flat data: ``data``, property drafts as an object, or the flat body."""
+    """A record write's data, as RushDB Cloud reads it: ``data`` (a flat object)
+    or ``properties`` (a list of property drafts). Anything else is refused."""
     data = body.get("data")
     if isinstance(data, dict):
         return data
     properties = body.get("properties")
     if isinstance(properties, list):
         return {item.get("name"): item.get("value") for item in properties}
-    if isinstance(properties, dict):
-        return properties
-    return {key: value for key, value in body.items() if key not in _RECORD_KEYS}
+    raise _http_error(
+        400, "A record write takes `data` (an object) or `properties` (a list)."
+    )
 
 
 def _is_empty(value: Any) -> bool:

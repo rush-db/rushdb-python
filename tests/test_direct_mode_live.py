@@ -50,6 +50,10 @@ def test_records_round_trip(db):
     assert db.records.find_by_id(created.id)["title"] == "Ubik"
     db.records.update(created.id, {"pages": 210})
     assert db.records.find_by_id(created.id)["pages"] == 210
+    db.records.update(created.id, {"pages": 211, "label": "worn"}, label=BOOK)
+    updated = db.records.find_by_id(created.id)
+    assert updated["pages"] == 211 and updated["label"] == "worn"
+    assert updated["title"] == "Ubik" and updated.label == BOOK
     db.records.set(created.id, {"title": "Ubik!"}, label=BOOK)
     replaced = db.records.find_by_id(created.id)
     assert replaced["title"] == "Ubik!" and replaced.get("pages") is None
