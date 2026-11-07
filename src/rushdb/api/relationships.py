@@ -10,6 +10,7 @@ from .relationship_patterns import RelationshipPatternsAPI
 
 if TYPE_CHECKING:
     from ..client import RushDB
+    from ..models.record import RecordTarget, RelationTarget
 
 
 class PaginationParams(TypedDict, total=False):
@@ -179,6 +180,61 @@ class RelationsAPI(BaseAPI):
             payload["manyToMany"] = many_to_many
         return self.client._make_request(
             "POST", "/relationships/create-many", payload, headers
+        )
+
+    def update(
+        self,
+        source: "RecordTarget",
+        target: "RelationTarget",
+        *,
+        type: str,
+        direction: Optional[str] = None,
+        set: Optional[dict] = None,
+        unset: Optional[typing.List[str]] = None,
+        types: Optional[typing.Dict[str, str]] = None,
+    ) -> dict:
+        """Update the properties of existing relationships of one type.
+
+        Changes the ``type`` relationships from ``source`` to each ``target`` (or the
+        reverse with ``direction='in'``). Pairs without such a relationship are skipped.
+        Not available inside a transaction. Needs RushDB 3.0.4 or newer.
+
+        Args:
+            source: The source record (id, ``Record`` or dict with ``__id``).
+            target: The target record(s).
+            type (str): The relationship type to update.
+            direction (str, optional): ``'out'`` (default) or ``'in'``.
+            set (dict, optional): Properties to write; ``None`` values store an explicit null.
+            unset (list[str], optional): Names of properties to remove.
+            types (dict, optional): Type of ``set`` properties JSON can't express, one of
+                ``'string'``, ``'number'``, ``'boolean'``, ``'datetime'``;
+                ``{"since": "datetime"}`` stores an ISO string as a datetime.
+
+        Returns:
+            dict: API response; ``data["updated"]`` counts the relationships changed.
+
+        Example:
+            >>> db.relationships.update(
+            ...     customer, order, type="PLACES", set={"channel": "store"}, unset=["legacyCode"]
+            ... )
+        """
+        from .records import RecordsAPI
+
+        source_id = RecordsAPI._extract_target_ids(source)[0]
+        payload: dict = {
+            "targetIds": RecordsAPI._extract_target_ids(target),
+            "type": type,
+        }
+        if direction:
+            payload["direction"] = direction
+        if set is not None:
+            payload["set"] = set
+        if unset is not None:
+            payload["unset"] = unset
+        if types:
+            payload["types"] = types
+        return self.client._make_request(
+            "PATCH", f"/relationships/{source_id}", payload
         )
 
     def delete_many(

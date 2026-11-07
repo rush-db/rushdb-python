@@ -191,6 +191,9 @@ EVERY_METHOD = {
     "records.detach": lambda db: db.records.detach(
         RECORD["id"], RECORD["id"], options={"typeOrTypes": "LIKES"}
     ),
+    "relationships.update": lambda db: db.relationships.update(
+        RECORD["id"], RECORD["id"], type="LIKES", set={"weight": 1}
+    ),
     "records.create": lambda db: db.records.create("Book", {"title": "Dune"}),
     "records.create_many": lambda db: db.records.create_many(
         "Book", [{"title": "Dune"}]
@@ -528,6 +531,39 @@ def test_detach_without_type_or_direction_removes_every_link(engine_calls):
             "sourceIds": [RECORD["id"]],
             "targetIds": ["t1"],
         },
+    ]
+
+
+def test_relationship_properties_are_updated_by_record_ids(engine_calls):
+    result = direct_db().relationships.update(
+        RECORD["id"],
+        ["t1", "t2"],
+        type="PLACES",
+        direction="in",
+        set={"channel": "web", "note": None, "since": "2026-11-06T10:00:00.000Z"},
+        unset=["old"],
+        types={"since": "datetime"},
+    )
+    assert result["data"]["updated"] == 1
+    commands = [
+        op["mutation"]["command"]
+        for op in operations(engine_calls)
+        if op.get("mutation", {}).get("kind") == "updateRelationshipsById"
+    ]
+    assert commands == [
+        {
+            "relationType": "PLACES",
+            "direction": "in",
+            "sourceIds": [RECORD["id"]],
+            "targetIds": ["t1", "t2"],
+            "set": {
+                "channel": "web",
+                "note": None,
+                "since": "2026-11-06T10:00:00.000Z",
+            },
+            "unset": ["old"],
+            "types": {"since": "datetime"},
+        }
     ]
 
 

@@ -753,6 +753,39 @@ def _detach(request: _Request) -> Body:
     )
 
 
+def _update_relationships(request: _Request) -> Body:
+    body, (source_id,) = request.body, request.params
+    _not_in_transaction(request.tx_id, "relationships.update")
+    result = request.engine.execute(
+        {
+            "kind": "mutate",
+            "mutation": {
+                "kind": "updateRelationshipsById",
+                "command": {
+                    "relationType": body.get("type"),
+                    "direction": (
+                        "in" if _direction(body.get("direction")) == "in" else "out"
+                    ),
+                    "sourceIds": [source_id],
+                    "targetIds": _as_list(body.get("targetIds")),
+                    "set": body.get("set") or {},
+                    "unset": body.get("unset") or [],
+                    # Sent only when used, so untyped updates work on engines without it.
+                    **({"types": body["types"]} if body.get("types") else {}),
+                },
+            },
+        }
+    )
+    updated = int((result or {}).get("affected") or 0)
+    plural = "" if updated == 1 else "s"
+    return _ok(
+        {
+            "message": f"{updated} relationship{plural} of Record {source_id} updated",
+            "updated": updated,
+        }
+    )
+
+
 def _link_many(kind: str, message: str, what: str) -> Callable[[_Request], Body]:
     def handle(request: _Request) -> Body:
         _not_in_transaction(request.tx_id, what)
@@ -1283,6 +1316,7 @@ _ROUTES: List[Tuple[str, "re.Pattern[str]", Callable[[_Request], Body]]] = [
     ("POST", re.compile(r"^/records/export/csv$"), _export_csv),
     ("POST", re.compile(rf"^/relationships/{_ID}$"), _attach),
     ("PUT", re.compile(rf"^/relationships/{_ID}$"), _detach),
+    ("PATCH", re.compile(rf"^/relationships/{_ID}$"), _update_relationships),
     (
         "POST",
         re.compile(r"^/relationships/create-many$"),
