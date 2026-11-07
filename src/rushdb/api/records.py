@@ -144,6 +144,7 @@ class RecordsAPI(BaseAPI):
             data (Dict[str, Any]): The data to merge with the existing record data.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
+            label (Optional[str]): Optional label to re-assign to the record.
 
         Returns:
             Dict[str, str]: Response from the server containing operation status.
@@ -154,8 +155,7 @@ class RecordsAPI(BaseAPI):
         """
         record_id = pick_record_id(target)
         headers = Transaction._build_transaction_header(transaction)
-
-        payload = data.copy()
+        payload: Dict[str, Any] = {"data": data}
         if label is not None:
             payload["label"] = label
         return self.client._make_request(

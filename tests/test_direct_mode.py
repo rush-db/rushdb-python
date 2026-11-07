@@ -483,6 +483,47 @@ def test_updates_replaces_deletes_and_links_are_staged_by_id(engine_calls):
     ]
 
 
+def put_records(calls):
+    return [
+        op["mutation"]
+        for op in operations(calls)
+        if op["kind"] == "mutate" and op["mutation"]["kind"] == "putRecord"
+    ]
+
+
+def test_update_merges_the_data_object_with_the_label(engine_calls):
+    db = direct_db()
+    data = {"title": "Emma", "label": "classic", "options": "a,b"}
+    db.records.update(RECORD["id"], data, label="Book")
+    (put,) = put_records(engine_calls)
+    assert put["mode"] == "merge" and put["id"] == RECORD["id"]
+    assert put["properties"] == data
+
+
+def test_a_flat_record_write_is_refused_as_cloud_refuses_it(engine_calls):
+    db = direct_db()
+    for method in ("PATCH", "PUT"):
+        with pytest.raises(RushDBError) as raised:
+            db._make_request(
+                method, f"/records/{RECORD['id']}", {"label": "Book", "title": "x"}
+            )
+        assert raised.value.status == 400
+    with pytest.raises(RushDBError):
+        db._make_request("POST", "/records", {"label": "Book", "title": "x"})
+    assert not put_records(engine_calls)
+
+
+def test_property_drafts_are_written_like_data(engine_calls):
+    db = direct_db()
+    db._make_request(
+        "PATCH",
+        f"/records/{RECORD['id']}",
+        {"label": "Book", "properties": [{"name": "title", "value": "Emma"}]},
+    )
+    (put,) = put_records(engine_calls)
+    assert put["properties"] == {"title": "Emma"}
+
+
 def test_imports_are_staged_into_a_transaction(engine_calls):
     db = direct_db()
     db.records.import_json([{"title": "Dune"}], label="Book", transaction="tx-1")
