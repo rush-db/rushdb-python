@@ -91,6 +91,7 @@ What each offers:
 | Managed embeddings: managed indexes, `records.vector_search` by text `query` | ✓ | — |
 | Natural-language search on SQL (`ai.search`, `ai.run_sql`) | ✓ | — |
 | Relationship-pattern suggestions (`relationships.patterns.*`) and join suggestions (`ai.get_join_candidates`) | ✓ | — |
+| Background file imports (`imports.*`) and SaaS connections (`connections.*`) | ✓ | — |
 | Project settings (`settings.get`), dashboard, team access | ✓ | — |
 
 In direct mode a Cloud-only method raises `CloudOnlyError` (with `method` and `reason`) before
@@ -238,6 +239,110 @@ db.records.import_csv(
     parse_config={'header': True, 'skipEmptyLines': True, 'dynamicTyping': True},
 )
 ```
+
+---
+
+## File imports and connections (RushDB Cloud)
+
+Large files and SaaS data load in the background: the client hands the data over and the run
+continues on the server. Every file import and every connection sync is an **import run**; follow it
+with `db.imports.get(id)` or `db.imports.wait(id)` until its status is `completed`, `partial`,
+`failed` or `cancelled`.
+
+### Import files
+
+```python
+# One call: create → upload every file → start (→ wait)
+run = db.imports.import_files(
+    [
+        {'data': 'customers.csv', 'label': 'Customer'},  # a path: name and size come from it
+        open('orders.csv.gz', 'rb'),                     # a binary file object works too
+    ],
+    mappings={0: {'keyColumn': 'id'}},  # re-importing upserts by `id`
+    links=[{'source': 1, 'sourceColumn': 'customer_id', 'target': 0, 'targetColumn': 'id', 'type': 'PLACED_BY'}],
+    parallelism=4,
+    wait=True,
+    wait_interval=2,
+    on_progress=lambda p: print(f"{p['loaded']}/{p['total']}" if p['phase'] == 'upload' else p['run']['status']),
+)
+print(run.data['recordsWritten'], run.data['summary'])
+```
+
+Or step by step, to show a preview before starting:
+
+```python
+import os
+
+created = db.imports.create([{'name': 'orders.csv', 'size': os.path.getsize('orders.csv')}]).data
+db.imports.upload(created['id'], created['files'][0], 'orders.csv', parallelism=4, retries=3)
+preview = db.imports.preview(created['id']).data  # column types, suggested key and links, personal data
+columns = preview['files'][0]['columns']  # each has `suggestion` ('include' | 'skip' | 'hash') and `pii` when it looks personal
+mapping = {
+    'skip': [c['name'] for c in columns if c['suggestion'] == 'skip'],
+    'hash': [c['name'] for c in columns if c['suggestion'] == 'hash'],  # keyed hash: joins, not readable
+}
+if preview['files'][0].get('suggestedKey'):
+    mapping['keyColumn'] = preview['files'][0]['suggestedKey']
+db.imports.start(created['id'], files=[{'id': created['files'][0]['id'], 'mapping': mapping}])
+finished = db.imports.wait(created['id'], timeout=30 * 60).data  # TimeoutError after 30 minutes
+```
+
+`upload` follows the upload mode the server returns: `s3-multipart` sends parts to their presigned
+URLs (`parallelism` at a time on a thread pool, default 4; each failed part retried, `retries`
+default 3) and completes with their ETags; `direct` sends the bytes through the API. Upload data can
+be a file path (`str` or `Path`), `bytes`/`bytearray`/`memoryview`, or a binary file object (read
+from its current position). A non-seekable stream (a pipe, a socket) needs its `size` up front in
+`import_files`, and a direct upload of one is not retried.
+
+Also: `imports.list(kind=, connection_id=, limit=, skip=)`, `cancel`, `retry`, `delete`,
+`add_files`, `remove_file`.
+
+### Connections
+
+```python
+import os
+
+catalog = db.connections.catalog().data  # connectors with their streams and config fields
+
+created = db.connections.create({
+    'connectorId': 'hubspot',
+    'auth': {'type': 'bearer', 'token': os.environ['HUBSPOT_TOKEN']},
+    'mode': 'scheduled',
+    'scheduleMinutes': 60,
+    'streams': [{'stream': 'contacts', 'policy': {'mode': 'auto', 'exclude': ['mobilephone']}}],
+}).data
+connection_id = created['connection']['id']
+db.connections.test(connection_id)
+db.connections.preview(connection_id, 'contacts')  # first records, nothing written
+
+# Field review: profiles with personal-data findings (masked examples), the policy, unreviewed fields
+review = db.connections.fields(connection_id, 'contacts', limit=100).data
+db.connections.review_fields(
+    connection_id,
+    'contacts',
+    [{'name': f['name'], 'action': f['suggestion']} for f in review['fields']],  # or your own choices
+)
+
+sync_run = db.connections.sync(connection_id).data  # or sync(connection_id, streams=['contacts'], full=True)
+db.imports.wait(sync_run['id'])
+```
+
+A stream's `policy` decides which fields reach the graph: `auto` keeps everything except `exclude`
+and `hash`; `review_fields` switches it to an `allowlist` of the fields marked `include` or `hash`,
+and fields that appear later wait in the stream's `unreviewed` list until the next review.
+
+On-prem databases sync through `rushdb-agent`: create an agent connection and hand the token
+(shown once) to the agent.
+
+```python
+agent = db.connections.create({'connectorId': 'agent', 'name': 'Warehouse', 'agent': {'intervalMinutes': 15}}).data
+print(agent['agentToken'])  # connection['agent'] shows what the agent last reported
+```
+
+Also: `list`, `get`, `update`, `delete(id, delete_data=True)`, `runs(id, limit=, skip=)`, `pause`,
+`resume`, `rotate_webhook_token` (a new webhook URL, or a new agent token), `push_templates()`
+(Zapier, Make and n8n recipes for push connections). Credentials are sealed on the server and never
+returned.
 
 ---
 

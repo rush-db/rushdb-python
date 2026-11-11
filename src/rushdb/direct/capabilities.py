@@ -8,6 +8,8 @@ the docs mark them. Everything else the SDK offers runs against a standalone
 from typing import Dict
 
 _PATTERNS = "relationship-pattern suggestions are produced and stored by the platform"
+_IMPORTS = "file imports run on the platform"
+_CONNECTIONS = "connections and their syncs run on the platform"
 
 CLOUD_ONLY_METHODS: Dict[str, str] = {
     "ai.search": "natural-language search turns the prompt into a SQL statement with an LLM",
@@ -22,6 +24,35 @@ CLOUD_ONLY_METHODS: Dict[str, str] = {
     "relationships.patterns.ignore": _PATTERNS,
     "relationships.patterns.delete": _PATTERNS,
     "settings.get": "project settings belong to the platform",
+    "imports.create": _IMPORTS,
+    "imports.add_files": _IMPORTS,
+    "imports.remove_file": _IMPORTS,
+    "imports.upload": _IMPORTS,
+    "imports.preview": _IMPORTS,
+    "imports.start": _IMPORTS,
+    "imports.get": _IMPORTS,
+    "imports.list": _IMPORTS,
+    "imports.wait": _IMPORTS,
+    "imports.cancel": _IMPORTS,
+    "imports.retry": _IMPORTS,
+    "imports.delete": _IMPORTS,
+    "imports.import_files": _IMPORTS,
+    "connections.catalog": _CONNECTIONS,
+    "connections.push_templates": _CONNECTIONS,
+    "connections.list": _CONNECTIONS,
+    "connections.get": _CONNECTIONS,
+    "connections.create": _CONNECTIONS,
+    "connections.update": _CONNECTIONS,
+    "connections.delete": _CONNECTIONS,
+    "connections.test": _CONNECTIONS,
+    "connections.preview": _CONNECTIONS,
+    "connections.fields": _CONNECTIONS,
+    "connections.review_fields": _CONNECTIONS,
+    "connections.sync": _CONNECTIONS,
+    "connections.runs": _CONNECTIONS,
+    "connections.pause": _CONNECTIONS,
+    "connections.resume": _CONNECTIONS,
+    "connections.rotate_webhook_token": _CONNECTIONS,
 }
 """Methods that need RushDB Cloud, with the reason."""
 
