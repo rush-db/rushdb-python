@@ -899,22 +899,78 @@ def _delete_property(request: _Request) -> Body:
 
 def _property_values(request: _Request) -> Body:
     body = request.body
-    result = request.engine.execute(
-        {
-            "kind": "query",
-            "query": {
-                "kind": "propertyValues",
-                "property": request.params[0],
-                "query": query_document(
-                    {
-                        "labels": body.get("labels") or [],
-                        "where": body.get("where") or {},
-                    }
-                ),
-            },
-        }
-    )
-    return _ok({"values": result.get("values") or []})
+    searched = bool(body.get("query")) or bool(body.get("limit"))
+    query: Body = {
+        "kind": "propertyValues",
+        "property": request.params[0],
+        "query": query_document(
+            {
+                "labels": body.get("labels") or [],
+                "where": body.get("where") or {},
+            }
+        ),
+    }
+    if searched:
+        query["mode"] = "topK"
+        query["limit"] = body.get("limit") or 100
+    if body.get("query"):
+        search: Body = {"text": body["query"], "match": body.get("match") or "contains"}
+        if body.get("domainOnMiss"):
+            search["domainOnMiss"] = body["domainOnMiss"]
+        if body.get("minSimilarity") is not None:
+            search["minSimilarity"] = body["minSimilarity"]
+        query["search"] = search
+    result = request.engine.execute({"kind": "query", "query": query})
+    data: Body = {"values": result.get("values") or []}
+    if result.get("counts"):
+        data["counts"] = result["counts"]
+    if searched and result.get("distinctCount") is not None:
+        data["distinctCount"] = result["distinctCount"]
+    if result.get("searchMissed"):
+        data["searchMissed"] = True
+    return _ok(data)
+
+
+def _search_values(request: _Request) -> Body:
+    body = request.body
+    search: Body = {"text": body.get("text"), "match": body.get("match") or "contains"}
+    if body.get("caseSensitive"):
+        search["caseSensitive"] = True
+    if body.get("minSimilarity") is not None:
+        search["minSimilarity"] = body["minSimilarity"]
+    query: Body = {"kind": "searchValues", "search": search}
+    if body.get("labels"):
+        query["labels"] = body["labels"]
+    if body.get("limit"):
+        query["limit"] = body["limit"]
+    result = request.engine.execute({"kind": "query", "query": query})
+    data: Body = {
+        "matches": result.get("matches") or [],
+        "total": result.get("total") or 0,
+    }
+    if result.get("skipped"):
+        data["skipped"] = result["skipped"]
+    return _ok(data)
+
+
+def _schema_summary(request: _Request) -> Body:
+    body = request.body
+    describe: Body = {"kind": "schemaSummary"}
+    if body.get("labels"):
+        describe["labels"] = body["labels"]
+    if body.get("fewValues") is not None:
+        describe["fewValues"] = body["fewValues"]
+    result = request.engine.execute({"kind": "describe", "describe": describe})
+    return _ok(result.get("labels") or [])
+
+
+def _resolve_names(request: _Request) -> Body:
+    body = request.body
+    describe: Body = {"kind": "names", "text": body.get("text")}
+    if body.get("limit"):
+        describe["limit"] = body["limit"]
+    result = request.engine.execute({"kind": "describe", "describe": describe})
+    return _ok(result.get("names") or [])
 
 
 def _find_labels(request: _Request) -> Body:
@@ -1394,6 +1450,15 @@ _ROUTES: List[Tuple[str, "re.Pattern[str]", Callable[[_Request], Body]]] = [
                 build_schema(r.engine, r.body.get("labels"), to_embedding_index)
             )
         ),
+    ),
+    # catalog reads; join suggestions are Cloud-only
+    ("POST", re.compile(r"^/ai/values/search$"), _search_values),
+    ("POST", re.compile(r"^/ai/schema/summary$"), _schema_summary),
+    ("POST", re.compile(r"^/ai/schema/names$"), _resolve_names),
+    (
+        "POST",
+        re.compile(r"^/ai/schema/join-candidates$"),
+        _cloud_only("ai.get_join_candidates"),
     ),
     ("GET", re.compile(r"^/text-indexes$"), lambda r: _ok(_text_indexes(r.engine))),
     ("POST", re.compile(r"^/text-indexes$"), _create_text_index),

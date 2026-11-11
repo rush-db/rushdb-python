@@ -5,9 +5,16 @@ and embedding index management.
 """
 
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from ..models.api_response import ApiResponse
+from ..models.catalog import (
+    JoinCandidate,
+    NameSuggestion,
+    SchemaSummaryLabel,
+    ValueMatchesData,
+)
+from ..models.property import ValueMatchMode
 from ..models.record import Record
 from ..models.result import RecordSearchResult
 from ..models.transaction import Transaction
@@ -126,6 +133,7 @@ class AIAPI(BaseAPI):
 
         >>> db = RushDB(api_key="...")
         >>> schema = db.ai.get_schema()
+        >>> found = db.ai.search_values("spiderman", match="similar")
         >>> results = db.ai.search("books about fast cars")
         >>> vectors = db.records.vector_search({
         ...     "query": "fast cars",
@@ -138,6 +146,136 @@ class AIAPI(BaseAPI):
     def __init__(self, client: "RushDB"):
         super().__init__(client)
         self.indexes = _AIIndexesNamespace(client)
+
+    def _catalog_read(self, path: str, body: Dict[str, Any]) -> ApiResponse:
+        response = self.client._make_request("POST", path, body)
+        return ApiResponse(
+            data=response.get("data"),
+            success=response.get("success", True),
+            total=response.get("total"),
+        )
+
+    def search_values(
+        self,
+        text: str,
+        match: Optional[ValueMatchMode] = None,
+        labels: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        min_similarity: Optional[float] = None,
+        case_sensitive: Optional[bool] = None,
+    ) -> "ApiResponse[ValueMatchesData]":
+        """Find stored values matching a text across every property.
+
+        Each match names the label and property holding the value and its
+        record count. It maps a word in a question to the value the data
+        actually stores (``"positive"`` to ``KCT = "+"`` once combined with
+        :meth:`get_schema_summary`).
+
+        Args:
+            text: The text to look for.
+            match: ``"contains"`` (default), ``"prefix"``, ``"exact"`` or
+                ``"similar"`` for near spellings (``spiderman`` finds
+                ``Spider-Man``).
+            labels: Labels to search (all when omitted).
+            limit: Most matches (default 50, at most 1000).
+            min_similarity: ``"similar"`` only: least similarity, 0 to 1
+                (default 0.6).
+            case_sensitive: Match case exactly (default ``False``).
+
+        Returns:
+            ApiResponse: ``data`` holds ``matches`` (each ``label``,
+            ``property``, ``value``, ``count``), ``total`` (matches before
+            ``limit``) and, when some properties could not be searched within
+            the request limits, ``skipped`` as ``label.property``.
+        """
+        body: Dict[str, Any] = {"text": text}
+        if match is not None:
+            body["match"] = match
+        if case_sensitive is not None:
+            body["caseSensitive"] = case_sensitive
+        if min_similarity is not None:
+            body["minSimilarity"] = min_similarity
+        if labels is not None:
+            body["labels"] = labels
+        if limit is not None:
+            body["limit"] = limit
+        return self._catalog_read("/ai/values/search", body)
+
+    def get_schema_summary(
+        self,
+        labels: Optional[List[str]] = None,
+        few_values: Optional[int] = None,
+    ) -> "ApiResponse[List[SchemaSummaryLabel]]":
+        """Every label with its properties in one read, from the live catalog.
+
+        Types, record and exact distinct counts, numeric and date ranges, the
+        values of properties that hold few, and relationship shapes.
+
+        Args:
+            labels: Labels to summarize (all when omitted).
+            few_values: List a property's values when it holds at most this
+                many (default 10).
+
+        Returns:
+            ApiResponse: ``data`` is a list of labels, each with ``name``,
+            ``recordsCount``, ``properties`` and ``relationships``.
+        """
+        body: Dict[str, Any] = {}
+        if labels is not None:
+            body["labels"] = labels
+        if few_values is not None:
+            body["fewValues"] = few_values
+        return self._catalog_read("/ai/schema/summary", body)
+
+    def resolve_names(
+        self, text: str, limit: Optional[int] = None
+    ) -> "ApiResponse[List[NameSuggestion]]":
+        """Labels and properties spelled like a name.
+
+        Ignores case, separators and plural endings: the answer to "no such
+        label or property" (``patients.birthdate`` to ``Patient.Birthday``).
+
+        Args:
+            text: The name, optionally as ``Label.property``.
+            limit: Most suggestions.
+
+        Returns:
+            ApiResponse: ``data`` is a list of suggestions, each with
+            ``label``, ``property`` (for a property) and ``score`` (spelling
+            similarity, 0 to 1).
+        """
+        body: Dict[str, Any] = {"text": text}
+        if limit is not None:
+            body["limit"] = limit
+        return self._catalog_read("/ai/schema/names", body)
+
+    def get_join_candidates(
+        self,
+        labels: Optional[List[str]] = None,
+        min_confidence: Optional[float] = None,
+    ) -> "ApiResponse[List[JoinCandidate]]":
+        """Properties that look like references to another label's key.
+
+        Found from property names and exact value containment (no language
+        model), each with its evidence. RushDB Cloud only: in direct mode it
+        raises :class:`~rushdb.common.CloudOnlyError`.
+
+        Args:
+            labels: Labels the candidates must touch (all when omitted).
+            min_confidence: Least confidence, 0 to 1 (default 0.5).
+
+        Returns:
+            ApiResponse: ``data`` is a list of candidates, each with
+            ``source`` and ``target`` (``label``, ``property``), ``reasons``,
+            ``relationshipType``, ``confidence``, ``evidence`` and
+            ``rationale``.
+        """
+        body: Dict[str, Any] = {}
+        if labels is not None:
+            body["labels"] = labels
+        if min_confidence is not None:
+            body["minConfidence"] = min_confidence
+        return self._catalog_read("/ai/schema/join-candidates", body)
 
     def get_schema(
         self,

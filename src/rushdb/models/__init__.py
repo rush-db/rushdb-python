@@ -1,4 +1,17 @@
-from .property import Property
+from .catalog import (
+    JoinCandidate,
+    NameSuggestion,
+    SchemaSummaryLabel,
+    SearchValuesParams,
+    ValueMatch,
+    ValueMatchesData,
+)
+from .property import (
+    Property,
+    PropertyValuesData,
+    PropertyValuesSearch,
+    ValueMatchMode,
+)
 from .record import Record
 from .relationship import (
     Relationship,
@@ -19,6 +32,15 @@ from .transaction import Transaction
 
 __all__ = [
     "Property",
+    "PropertyValuesData",
+    "PropertyValuesSearch",
+    "ValueMatchMode",
+    "JoinCandidate",
+    "NameSuggestion",
+    "SchemaSummaryLabel",
+    "SearchValuesParams",
+    "ValueMatch",
+    "ValueMatchesData",
     "Record",
     "Relationship",
     "RelationshipDetachOptions",

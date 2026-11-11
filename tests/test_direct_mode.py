@@ -71,6 +71,26 @@ def engine_answer(operation):
             "property": "title",
             "values": ["Dune"],
         },
+        "query.searchValues": {
+            "kind": "valueMatches",
+            "matches": [
+                {"label": "Book", "property": "title", "value": "Dune", "count": 1}
+            ],
+            "total": 1,
+        },
+        "describe.schemaSummary": {
+            "kind": "schemaSummary",
+            "labels": [
+                {
+                    "name": "Book",
+                    "recordsCount": 1,
+                    "properties": [
+                        {"name": "title", "type": "string", "recordsCount": 1}
+                    ],
+                }
+            ],
+        },
+        "describe.names": {"kind": "names", "names": [{"label": "Book", "score": 1}]},
         "query.statement": {"kind": "rows", "rows": [{"n": 1}], "total": 1},
         "query.exportCsv": {
             "kind": "csv",
@@ -275,6 +295,10 @@ EVERY_METHOD = {
     ),
     "ai.search": lambda db: db.ai.search("books about deserts"),
     "ai.run_sql": lambda db: db.ai.run_sql('SELECT __id FROM "Book"'),
+    "ai.search_values": lambda db: db.ai.search_values("dune"),
+    "ai.get_schema_summary": lambda db: db.ai.get_schema_summary(),
+    "ai.resolve_names": lambda db: db.ai.resolve_names("books"),
+    "ai.get_join_candidates": lambda db: db.ai.get_join_candidates(),
     "settings.get": lambda db: db.settings.get(),
 }
 
@@ -389,6 +413,63 @@ def test_export_returns_the_csv_text(engine_calls):
         direct_db().records.export({"labels": ["Book"]})
         == "__id,__label,title\r\nr1,Book,Dune"
     )
+
+
+def test_property_values_apply_a_text_query_as_an_engine_value_search(engine_calls):
+    values = direct_db().properties.values("p1", query="positive", domain_on_miss=20)
+    query = operations(engine_calls)[0]["query"]
+    assert {key: value for key, value in query.items() if key != "query"} == {
+        "kind": "propertyValues",
+        "property": "p1",
+        "mode": "topK",
+        "limit": 100,
+        "search": {"text": "positive", "match": "contains", "domainOnMiss": 20},
+    }
+    assert values["data"]["values"] == ["Dune"]
+
+
+def test_property_values_without_a_search_read_every_value(engine_calls):
+    direct_db().properties.values("p1")
+    query = operations(engine_calls)[0]["query"]
+    assert "mode" not in query and "search" not in query
+
+
+def test_catalog_suggestions_map_to_their_engine_reads(engine_calls):
+    db = direct_db()
+    found = db.ai.search_values("spiderman", match="similar", labels=["Book"])
+    summary = db.ai.get_schema_summary(few_values=5)
+    names = db.ai.resolve_names("books", limit=3)
+    assert operations(engine_calls) == [
+        {
+            "kind": "query",
+            "query": {
+                "kind": "searchValues",
+                "search": {"text": "spiderman", "match": "similar"},
+                "labels": ["Book"],
+            },
+        },
+        {"kind": "describe", "describe": {"kind": "schemaSummary", "fewValues": 5}},
+        {
+            "kind": "describe",
+            "describe": {"kind": "names", "text": "books", "limit": 3},
+        },
+    ]
+    assert found.data["matches"][0] == {
+        "label": "Book",
+        "property": "title",
+        "value": "Dune",
+        "count": 1,
+    }
+    assert found.data["total"] == 1
+    assert summary.data[0]["name"] == "Book"
+    assert names.data == [{"label": "Book", "score": 1}]
+
+
+def test_join_candidates_need_cloud(engine_calls):
+    with pytest.raises(CloudOnlyError) as refused:
+        direct_db().ai.get_join_candidates(labels=["Book"])
+    assert refused.value.method == "ai.get_join_candidates"
+    assert engine_calls == []
 
 
 def test_a_text_vector_search_needs_cloud(engine_calls):

@@ -1,24 +1,32 @@
 import typing
 from typing import List, Optional
 
-from ..models.property import Property, PropertyValuesData
+from ..models.property import (
+    Property,
+    PropertyValuesData,
+    PropertyValuesSearch,
+    ValueMatchMode,
+)
 from ..models.search_query import SearchQuery
 from ..models.transaction import Transaction
 from .base import BaseAPI
 
 
-class PropertyValuesQuery(SearchQuery, total=False):
-    """Extended SearchQuery for property values endpoint with text search support.
-
-    This class extends the base SearchQuery to include additional search capabilities
-    specifically for querying property values, including text-based search functionality.
+class PropertyValuesQuery(SearchQuery, PropertyValuesSearch, total=False):
+    """Extended SearchQuery for property values endpoint with value search.
 
     Attributes:
-        query (Optional[str]): Text search string to filter property values.
-            When provided, performs a text-based search among the property values.
+        query (Optional[str]): Keep the values whose text matches; the values
+            then rank by record count and come with ``counts``.
+        match (str): How ``query`` matches: ``contains`` (default), ``prefix``,
+            ``exact`` or ``similar`` for near spellings.
+        limit (Optional[int]): Most values returned, by record count (default
+            100 with ``query``).
+        domainOnMiss (int): With no match, list every value of a property
+            holding at most this many (``searchMissed: True``).
+        minSimilarity (float): ``similar`` only: least similarity, 0 to 1
+            (default 0.6).
     """
-
-    query: Optional[str]  # For text search among values
 
 
 class PropertiesAPI(BaseAPI):
@@ -168,12 +176,18 @@ class PropertiesAPI(BaseAPI):
         property_id: str,
         search_query: Optional[PropertyValuesQuery] = None,
         transaction: Optional[Transaction] = None,
+        *,
+        query: Optional[str] = None,
+        match: Optional[ValueMatchMode] = None,
+        limit: Optional[int] = None,
+        domain_on_miss: Optional[int] = None,
+        min_similarity: Optional[float] = None,
     ) -> PropertyValuesData:
         """Retrieve and search values data for a specific property.
 
         Gets statistical and analytical data about the values stored in a particular property,
-        including value distributions, counts, and other metadata. Supports text-based
-        searching within the property values.
+        including value distributions, counts, and other metadata. A ``query`` applies as a
+        value search: the values whose text matches, ranked by record count, with ``counts``.
 
         Args:
             property_id (str): The unique identifier of the property to analyze.
@@ -184,10 +198,21 @@ class PropertiesAPI(BaseAPI):
                 Defaults to None.
             transaction (Optional[Transaction], optional): Transaction context for the operation.
                 If provided, the operation will be part of the transaction. Defaults to None.
+            query (Optional[str]): Keep the values whose text matches. Overrides
+                ``search_query["query"]``, as do the options below their keys.
+            match (Optional[str]): ``contains`` (default), ``prefix``, ``exact`` or
+                ``similar`` for near spellings.
+            limit (Optional[int]): Most values returned, by record count (default 100
+                with ``query``).
+            domain_on_miss (Optional[int]): With no match, list every value of a property
+                holding at most this many; the result then has ``searchMissed: True``.
+            min_similarity (Optional[float]): ``similar`` only: least similarity, 0 to 1
+                (default 0.6).
 
         Returns:
             PropertyValuesData: Object containing statistical and analytical data about
-                the property's values, including distributions, counts, and value samples.
+                the property's values; a searched or limited read adds ``counts`` (aligned
+                with ``values``) and ``distinctCount`` (matches before ``limit``).
 
         Raises:
             ValueError: If the property_id is invalid or empty.
@@ -204,12 +229,26 @@ class PropertiesAPI(BaseAPI):
             >>> # Search for specific values
             >>> query = PropertyValuesQuery(query="search_text")
             >>> filtered_values = properties_api.values("prop_123", query)
+            >>>
+            >>> # How "positive" is stored, with the whole domain when nothing matches
+            >>> properties_api.values("prop_123", query="positive", domain_on_miss=20)
         """
         headers = Transaction._build_transaction_header(transaction)
+
+        body: typing.Dict[str, typing.Any] = dict(search_query or {})
+        for key, value in (
+            ("query", query),
+            ("match", match),
+            ("limit", limit),
+            ("domainOnMiss", domain_on_miss),
+            ("minSimilarity", min_similarity),
+        ):
+            if value is not None:
+                body[key] = value
 
         return self.client._make_request(
             "POST",
             f"/properties/{property_id}/values",
-            typing.cast(typing.Dict[str, typing.Any], search_query or {}),
+            body,
             headers,
         )
