@@ -300,6 +300,55 @@ EVERY_METHOD = {
     "ai.resolve_names": lambda db: db.ai.resolve_names("books"),
     "ai.get_join_candidates": lambda db: db.ai.get_join_candidates(),
     "settings.get": lambda db: db.settings.get(),
+    "imports.create": lambda db: db.imports.create([{"name": "a.csv", "size": 1}]),
+    "imports.add_files": lambda db: db.imports.add_files(
+        "imp-1", [{"name": "b.csv", "size": 1}]
+    ),
+    "imports.remove_file": lambda db: db.imports.remove_file("imp-1", "f1"),
+    "imports.upload": lambda db: db.imports.upload(
+        "imp-1",
+        {
+            "id": "f1",
+            "size": 1,
+            "upload": {"mode": "direct", "method": "PUT", "path": "/x"},
+        },
+        b"x",
+    ),
+    "imports.preview": lambda db: db.imports.preview("imp-1"),
+    "imports.start": lambda db: db.imports.start("imp-1"),
+    "imports.get": lambda db: db.imports.get("imp-1"),
+    "imports.list": lambda db: db.imports.list(),
+    "imports.wait": lambda db: db.imports.wait("imp-1"),
+    "imports.cancel": lambda db: db.imports.cancel("imp-1"),
+    "imports.retry": lambda db: db.imports.retry("imp-1"),
+    "imports.delete": lambda db: db.imports.delete("imp-1"),
+    "imports.import_files": lambda db: db.imports.import_files(
+        [{"data": b"x", "name": "a.csv"}]
+    ),
+    "connections.catalog": lambda db: db.connections.catalog(),
+    "connections.push_templates": lambda db: db.connections.push_templates(),
+    "connections.list": lambda db: db.connections.list(),
+    "connections.get": lambda db: db.connections.get("conn-1"),
+    "connections.create": lambda db: db.connections.create(
+        {"connectorId": "agent", "name": "Warehouse"}
+    ),
+    "connections.update": lambda db: db.connections.update(
+        "conn-1", {"scheduleMinutes": 30}
+    ),
+    "connections.delete": lambda db: db.connections.delete("conn-1", delete_data=True),
+    "connections.test": lambda db: db.connections.test("conn-1"),
+    "connections.preview": lambda db: db.connections.preview("conn-1", "contacts"),
+    "connections.fields": lambda db: db.connections.fields("conn-1", "contacts"),
+    "connections.review_fields": lambda db: db.connections.review_fields(
+        "conn-1", "contacts", [{"name": "email", "action": "hash"}]
+    ),
+    "connections.sync": lambda db: db.connections.sync("conn-1"),
+    "connections.runs": lambda db: db.connections.runs("conn-1"),
+    "connections.pause": lambda db: db.connections.pause("conn-1"),
+    "connections.resume": lambda db: db.connections.resume("conn-1"),
+    "connections.rotate_webhook_token": lambda db: db.connections.rotate_webhook_token(
+        "conn-1"
+    ),
 }
 
 # Answered without the engine (it has no operation for them).
@@ -329,6 +378,8 @@ def sdk_methods(db):
         "ai",
         "text_indexes",
         "settings",
+        "imports",
+        "connections",
     ):
         walk(getattr(db, namespace), [namespace], 0)
     return found
@@ -356,6 +407,20 @@ def test_method_talks_to_the_engine_only_or_is_refused_as_cloud_only(
         assert outcome is None, outcome
         if method not in ANSWERED_LOCALLY:
             assert engine_calls
+
+
+def test_imports_and_connections_are_cloud_only_in_direct_mode():
+    for name, method in EVERY_METHOD.items():
+        if name.startswith(("imports.", "connections.")):
+            assert name in CLOUD_ONLY_METHODS, name
+    with mock.patch("urllib.request.urlopen") as urlopen:
+        with pytest.raises(CloudOnlyError) as raised:
+            direct_db().imports.import_files([{"data": b"x", "name": "a.csv"}])
+        assert raised.value.method == "imports.import_files"
+        with pytest.raises(CloudOnlyError) as raised:
+            direct_db().connections.sync("conn-1")
+        assert raised.value.method == "connections.sync"
+    urlopen.assert_not_called()
 
 
 def test_direct_mode_needs_an_engine_url():

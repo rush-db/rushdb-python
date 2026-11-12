@@ -1,4 +1,6 @@
 from .ai import AIAPI
+from .connections import ConnectionsAPI
+from .imports import ImportsAPI
 from .labels import LabelsAPI
 from .properties import PropertiesAPI
 from .query import QueryAPI
@@ -18,4 +20,6 @@ __all__ = [
     "RelationsAPI",
     "RelationshipPatternsAPI",
     "TextIndexesAPI",
+    "ImportsAPI",
+    "ConnectionsAPI",
 ]

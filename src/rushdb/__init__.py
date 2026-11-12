@@ -4,6 +4,8 @@ Exposes the RushDB class.
 """
 
 from .api.ai import AIAPI
+from .api.connections import ConnectionsAPI
+from .api.imports import ImportsAPI
 from .api.query import QueryAPI
 from .api.records import pick_record_id
 from .api.relationship_patterns import RelationshipPatternsAPI
@@ -25,6 +27,7 @@ from .models.catalog import (
     ValueMatch,
     ValueMatchesData,
 )
+from .models.ingest import FINISHED_IMPORT_RUN_STATUSES
 from .models.property import (
     Property,
     PropertyValuesData,
@@ -91,4 +94,7 @@ __all__ = [
     "ApiResponse",
     "AIAPI",
     "TextIndexesAPI",
+    "ImportsAPI",
+    "ConnectionsAPI",
+    "FINISHED_IMPORT_RUN_STATUSES",
 ]

@@ -9,9 +9,11 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .api.ai import AIAPI
+from .api.connections import ConnectionsAPI
+from .api.imports import ImportsAPI
 from .api.labels import LabelsAPI
 from .api.properties import PropertiesAPI
 from .api.query import QueryAPI
@@ -65,6 +67,9 @@ class RushDB:
         properties (PropertiesAPI): API interface for property operations
         labels (LabelsAPI): API interface for label operations
         tx (TransactionsAPI): API interface for transaction operations
+        imports (ImportsAPI): Background file imports (RushDB Cloud only)
+        connections (ConnectionsAPI): SaaS connections and their syncs
+            (RushDB Cloud only)
         settings (_SettingsNamespace): API interface for project settings
 
     Example:
@@ -186,6 +191,8 @@ class RushDB:
         self.relationships = RelationsAPI(self)
         self.ai = AIAPI(self)
         self.text_indexes = TextIndexesAPI(self)
+        self.imports = ImportsAPI(self)
+        self.connections = ConnectionsAPI(self)
         self.settings = _SettingsNamespace(self)
 
     def _make_request(
@@ -296,6 +303,58 @@ class RushDB:
             raise RushDBError(f"Connection error: {str(e)}")
         except json.JSONDecodeError as e:
             raise RushDBError(f"Invalid JSON response: {str(e)}")
+
+    def _send_raw(
+        self,
+        method: str,
+        url: str,
+        body: Any,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
+        what: str = "request failed",
+    ) -> Tuple[int, Dict[str, str], bytes]:
+        """Send a raw (non-JSON) body to an absolute URL.
+
+        Used for file uploads: presigned storage URLs (no auth header) and the
+        API's direct upload path (the caller adds the auth header). ``body`` is
+        bytes or a binary file object; a file object needs a
+        ``Content-Length`` header.
+
+        Returns:
+            The status code, the response headers and the response body.
+
+        Raises:
+            RushDBError: With ``status`` set on an HTTP error status, and
+                without it on a network error or timeout.
+        """
+        request = urllib.request.Request(
+            url, data=body, headers=dict(headers or {}), method=method
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return (
+                    response.status,
+                    {key: value for key, value in response.headers.items()},
+                    response.read(),
+                )
+        except urllib.error.HTTPError as e:
+            # Storage answers XML; the status says enough then.
+            try:
+                error_body = json.loads(e.read().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+                error_body = {}
+            if not isinstance(error_body, dict):
+                error_body = {}
+            message = error_body.get("message") or error_body.get("error")
+            if isinstance(message, list):
+                message = "; ".join(str(item) for item in message)
+            raise RushDBError(
+                str(message) if message else f"{what} (HTTP {e.code})",
+                error_body,
+                status=e.code,
+            )
+        except (urllib.error.URLError, OSError) as e:
+            raise RushDBError(f"{what}: {e}")
 
     def ping(self) -> bool:
         """Test connectivity to the RushDB server.
