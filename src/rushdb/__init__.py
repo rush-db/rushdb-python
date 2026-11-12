@@ -17,7 +17,20 @@ from .direct.capabilities import (
     is_cloud_only_method,
 )
 from .models.api_response import ApiResponse
-from .models.property import Property
+from .models.catalog import (
+    JoinCandidate,
+    NameSuggestion,
+    SchemaSummaryLabel,
+    SearchValuesParams,
+    ValueMatch,
+    ValueMatchesData,
+)
+from .models.property import (
+    Property,
+    PropertyValuesData,
+    PropertyValuesSearch,
+    ValueMatchMode,
+)
 from .models.record import Record, RecordTarget, RelationTarget
 from .models.relationship import (
     Relationship,
@@ -53,6 +66,15 @@ __all__ = [
     "SearchResult",
     "Transaction",
     "Property",
+    "PropertyValuesData",
+    "PropertyValuesSearch",
+    "ValueMatchMode",
+    "JoinCandidate",
+    "NameSuggestion",
+    "SchemaSummaryLabel",
+    "SearchValuesParams",
+    "ValueMatch",
+    "ValueMatchesData",
     "Relationship",
     "RelationshipDirection",
     "RelationshipOptions",

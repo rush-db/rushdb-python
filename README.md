@@ -56,7 +56,7 @@ The SDK works with RushDB in one of two ways:
 | Connect with | an API key | the engine URL and the engine token |
 
 The engine is what you can self-host. RushDB Cloud runs that engine for you and adds the dashboard,
-managed embeddings and the AI features (natural-language search, relationship-pattern suggestions),
+managed embeddings and the AI features (natural-language search, relationship-pattern and join suggestions),
 which exist only in RushDB Cloud.
 
 ```python
@@ -85,11 +85,12 @@ What each offers:
 | External vector indexes; vector search with a `queryVector` you supply | ✓ | ✓ |
 | Raw openCypher (`query.raw`; the engine needs `--languages cypher`) | ✓ | ✓ |
 | Schema (`ai.get_schema`, `ai.get_schema_markdown`) | ✓ | ✓ |
+| Catalog lookups: `ai.search_values` (a value across every property, also near spellings), `ai.get_schema_summary`, `ai.resolve_names`, and value search in `properties.values` (`query`, `match`, `domain_on_miss`) | ✓ | ✓ |
 | Keyword (BM25) search (`records.text_search`), text indexes (`text_indexes.*`), hybrid search | ✓ | ✓ |
 | Transactions | ✓ | record creates, updates, sets, deletes by id, attaches and imports are staged; other writes refuse a transaction |
 | Managed embeddings: managed indexes, `records.vector_search` by text `query` | ✓ | — |
 | Natural-language search on SQL (`ai.search`, `ai.run_sql`) | ✓ | — |
-| Relationship-pattern suggestions (`relationships.patterns.*`) | ✓ | — |
+| Relationship-pattern suggestions (`relationships.patterns.*`) and join suggestions (`ai.get_join_candidates`) | ✓ | — |
 | Project settings (`settings.get`), dashboard, team access | ✓ | — |
 
 In direct mode a Cloud-only method raises `CloudOnlyError` (with `method` and `reason`) before
@@ -342,6 +343,31 @@ results = db.records.vector_search({
     'fusion': 'dbsf',
     'limit': 5,
 })
+```
+
+## Catalog Lookups
+
+Map the words of a question to what the data actually stores before building a
+query. Each is one read of the live catalog:
+
+```python
+# Where is a value stored? Every property, with label, property and record count
+found = db.ai.search_values('spiderman', match='similar')  # contains | prefix | exact | similar
+for m in found.data['matches']:
+    print(m['label'], m['property'], m['value'], m['count'])
+
+# Every label with its properties, distinct counts, ranges and the values of small fields
+summary = db.ai.get_schema_summary(labels=['Patient'], few_values=10)
+
+# The real label or property behind a name that is not in the schema
+db.ai.resolve_names('patients.birthdate')  # -> Patient.Birthday
+
+# Value search within one property: ranked by record count, with counts;
+# when nothing matches, list the whole domain of a small property
+db.properties.values(property_id, query='positive', domain_on_miss=20)
+
+# How labels reference each other, with evidence (RushDB Cloud only)
+db.ai.get_join_candidates(labels=['Order'], min_confidence=0.5)
 ```
 
 ---
