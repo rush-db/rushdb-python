@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
 
-from ..common import RushDBError
+from ..common import RushDBError, parse_error_body
 
 
 class DirectEngine:
@@ -65,15 +65,20 @@ class DirectEngine:
             with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
                 body = json.loads(resp.read().decode("utf-8") or "{}")
         except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
             try:
-                parsed = json.loads(raw)
-                message = parsed.get("error", {}).get("message", raw)
-            except json.JSONDecodeError:
-                message = raw or f"engine request failed ({exc.code})"
-            raise RushDBError(message, status=exc.code) from exc
+                raw = exc.read()
+            except OSError:
+                raw = b""
+            message, details, code = parse_error_body(raw)
+            raise RushDBError(
+                message or f"engine request failed (HTTP {exc.code})",
+                details,
+                status=exc.code,
+                code=code,
+            ) from exc
         except urllib.error.URLError as exc:
             raise RushDBError(f"Connection error: {exc}") from exc
         if body.get("error"):
-            raise RushDBError(body["error"].get("message", "engine request failed"))
+            message, details, code = parse_error_body(json.dumps(body))
+            raise RushDBError(message or "engine request failed", details, code=code)
         return body.get("response", {})

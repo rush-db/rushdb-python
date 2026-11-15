@@ -1,4 +1,59 @@
-from typing import Dict, Optional
+import json
+import re
+from typing import Any, Dict, Optional, Tuple
+
+# A bare ``{"error": "unauthorized"}`` names a code; ``"route not found"`` does not.
+_CODE_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
+
+
+def parse_error_body(raw: Any) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
+    """Read an HTTP error body into ``(message, details, code)``.
+
+    Accepts every shape the engine and the API answer with:
+
+    - the protocol envelope ``{"protocolVersion": 1, "error": {"code", "message",
+      "retryable"}}``;
+    - a bare string ``{"error": "unauthorized"}`` (engine auth failures);
+    - flat ``{"code", "message", "retryable"}`` (engine boot) and the API's
+      ``{"statusCode", "message", "error"}``, where ``message`` may be a list;
+    - plain text, HTML from a proxy, or an empty body.
+
+    ``message`` is ``None`` when the body has nothing worth showing; callers
+    fall back to a message built from the HTTP status. ``details`` is the
+    parsed JSON object (``{}`` otherwise).
+    """
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
+    text = (raw or "").strip()
+    if not text:
+        return None, {}, None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # Plain text is the message; an HTML error page from a proxy is not.
+        if text.startswith("<"):
+            return None, {}, None
+        return text[:500], {}, None
+    if not isinstance(parsed, dict):
+        return None, {}, None
+
+    message: Any = parsed.get("message")
+    code: Any = parsed.get("code")
+    error = parsed.get("error")
+    if isinstance(error, dict):
+        message = error.get("message") or message
+        code = error.get("code") or code
+    elif isinstance(error, str) and error and not message:
+        message = error
+        if not code and _CODE_PATTERN.fullmatch(error):
+            code = error
+    if isinstance(message, list):
+        message = "; ".join(str(item) for item in message)
+    return (
+        str(message) if message else None,
+        parsed,
+        code if isinstance(code, str) and code else None,
+    )
 
 
 class RushDBError(Exception):
