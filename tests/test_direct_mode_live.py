@@ -5,15 +5,22 @@
 
     rushdb serve --data-dir /tmp/rushdb-test --port 3877 --languages cypher
     RUSHDB_TEST_ENGINE_URL=http://127.0.0.1:3877 pytest tests/test_direct_mode_live.py
+
+The read-only capability test also needs the engine's
+``--capability-secret`` in ``RUSHDB_TEST_ENGINE_CAPABILITY_SECRET``.
 """
 
+import base64
+import hashlib
+import hmac
+import json
 import os
 import time
 import uuid
 
 import pytest
 
-from rushdb import CloudOnlyError, DirectModeError, RushDB
+from rushdb import CloudOnlyError, DirectModeError, RushDB, RushDBError
 
 ENGINE_URL = os.environ.get("RUSHDB_TEST_ENGINE_URL")
 pytestmark = pytest.mark.skipif(
@@ -213,3 +220,39 @@ def test_cloud_features_are_refused(db):
         db.relationships.patterns.list()
     with pytest.raises(CloudOnlyError):
         db.settings.get()
+
+
+def test_bad_token_raises_rushdb_error():
+    db = RushDB("not-the-token", direct=True, engine_url=ENGINE_URL)
+    with pytest.raises(RushDBError) as failure:
+        db.records.create(BOOK, {"title": "Refused"})
+    assert failure.value.status == 401
+    assert failure.value.code == "unauthorized"
+
+
+def capability(secret, scope):
+    def encode(data):
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+    now = int(time.time())
+    claims = encode(
+        json.dumps(
+            {"sub": "sdk-test", "scope": scope, "iat": now, "exp": now + 600}
+        ).encode()
+    )
+    signature = hmac.new(bytes.fromhex(secret), claims.encode(), hashlib.sha256)
+    return f"{claims}.{encode(signature.digest())}"
+
+
+@pytest.mark.skipif(
+    not os.environ.get("RUSHDB_TEST_ENGINE_CAPABILITY_SECRET"),
+    reason="RUSHDB_TEST_ENGINE_CAPABILITY_SECRET is not set",
+)
+def test_write_with_read_only_capability_raises_rushdb_error(db):
+    token = capability(os.environ["RUSHDB_TEST_ENGINE_CAPABILITY_SECRET"], "read")
+    reader = RushDB(token, direct=True, engine_url=ENGINE_URL)
+    assert reader.records.find({"labels": [BOOK]}).total >= 3
+    with pytest.raises(RushDBError) as failure:
+        reader.records.create(BOOK, {"title": "Refused"})
+    assert failure.value.status == 401
+    assert failure.value.code == "unauthorized"

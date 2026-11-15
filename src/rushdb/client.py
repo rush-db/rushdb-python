@@ -21,7 +21,7 @@ from .api.records import RecordsAPI
 from .api.relationships import RelationsAPI
 from .api.text_indexes import TextIndexesAPI
 from .api.transactions import TransactionsAPI
-from .common import RushDBError
+from .common import RushDBError, parse_error_body
 from .direct import DirectEngine
 from .direct import router as direct_router
 from .utils.token_prefix import extract_mixed_properties_from_token
@@ -288,17 +288,16 @@ class RushDB:
             with urllib.request.urlopen(request) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            # Error bodies are usually JSON, but a gateway/proxy may return HTML or an
-            # empty body — without this guard the JSONDecodeError raised here would
-            # escape as-is instead of surfacing as a RushDBError.
+            # Error bodies are usually JSON, but a gateway/proxy may return HTML,
+            # plain text or an empty body; all of them surface as a RushDBError.
             try:
-                error_body = json.loads(e.read().decode("utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                error_body = {}
-            message = error_body.get("message")
-            if isinstance(message, list):
-                message = "; ".join(str(item) for item in message)
-            raise RushDBError(message or f"HTTP {e.code}", error_body, status=e.code)
+                raw = e.read()
+            except OSError:
+                raw = b""
+            message, error_body, code = parse_error_body(raw)
+            raise RushDBError(
+                message or f"HTTP {e.code}", error_body, status=e.code, code=code
+            )
         except urllib.error.URLError as e:
             raise RushDBError(f"Connection error: {str(e)}")
         except json.JSONDecodeError as e:
@@ -340,18 +339,15 @@ class RushDB:
         except urllib.error.HTTPError as e:
             # Storage answers XML; the status says enough then.
             try:
-                error_body = json.loads(e.read().decode("utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-                error_body = {}
-            if not isinstance(error_body, dict):
-                error_body = {}
-            message = error_body.get("message") or error_body.get("error")
-            if isinstance(message, list):
-                message = "; ".join(str(item) for item in message)
+                raw = e.read()
+            except OSError:
+                raw = b""
+            message, error_body, code = parse_error_body(raw)
             raise RushDBError(
-                str(message) if message else f"{what} (HTTP {e.code})",
+                message or f"{what} (HTTP {e.code})",
                 error_body,
                 status=e.code,
+                code=code,
             )
         except (urllib.error.URLError, OSError) as e:
             raise RushDBError(f"{what}: {e}")
