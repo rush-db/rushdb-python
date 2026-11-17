@@ -11,6 +11,7 @@ import pytest
 
 from rushdb import RushDB, RushDBError
 from rushdb.common import parse_error_body
+from rushdb.direct import DirectEngine
 
 ENVELOPE = {
     "protocolVersion": 1,
@@ -76,7 +77,9 @@ def refusing(status, body):
 @pytest.mark.parametrize("body,message,code", SHAPES.values(), ids=SHAPES.keys())
 def test_direct_mode_raises_rushdb_error(body, message, code):
     db = RushDB("BAD", direct=True, engine_url="http://engine:3000")
-    with mock.patch("urllib.request.urlopen", side_effect=refusing(401, body)):
+    with mock.patch.object(
+        DirectEngine, "_send", return_value=(401, body.encode("utf-8"))
+    ):
         with pytest.raises(RushDBError) as failure:
             db.records.create("Book", {"title": "Dune"})
     assert str(failure.value) == (message or "engine request failed (HTTP 401)")
@@ -110,18 +113,9 @@ def test_raw_upload_raises_rushdb_error(body, message, code):
     "error", [ENVELOPE["error"], "unauthorized"], ids=["object", "string"]
 )
 def test_direct_mode_error_in_a_200_body(error):
-    class Response(io.BytesIO):
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    def answer(request, timeout=None):
-        return Response(json.dumps({"protocolVersion": 1, "error": error}).encode())
-
+    answer = json.dumps({"protocolVersion": 1, "error": error}).encode()
     db = RushDB("BAD", direct=True, engine_url="http://engine:3000")
-    with mock.patch("urllib.request.urlopen", side_effect=answer):
+    with mock.patch.object(DirectEngine, "_send", return_value=(200, answer)):
         with pytest.raises(RushDBError) as failure:
             db.records.create("Book", {"title": "Dune"})
     assert failure.value.code == "unauthorized"

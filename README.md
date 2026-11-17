@@ -104,6 +104,12 @@ from rushdb import CLOUD_ONLY_METHODS, CloudOnlyError, is_cloud_only_method
 
 `db.engine.execute()` runs any Protocol v1 operation directly.
 
+Direct mode keeps its connection to the engine alive: each thread reuses one connection, so a call
+does not pay for a new TCP (or TLS) handshake. A connection the engine closed is replaced; a read
+that lost its connection is sent once more, a write is not (it raises `RushDBError`).
+`db.engine.close()` closes the open connections. When `HTTP_PROXY`/`HTTPS_PROXY` applies to the
+engine URL, calls go through the proxy without keep-alive.
+
 ---
 
 ## Agent memory in 3 lines
