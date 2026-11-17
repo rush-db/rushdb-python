@@ -15,6 +15,7 @@ import hashlib
 import hmac
 import json
 import os
+import threading
 import time
 import uuid
 
@@ -220,6 +221,22 @@ def test_cloud_features_are_refused(db):
         db.relationships.patterns.list()
     with pytest.raises(CloudOnlyError):
         db.settings.get()
+
+
+def test_calls_share_one_connection(db):
+    db.engine.close()
+    db.records.find({"labels": [BOOK]})
+    conn = db.engine._connections[threading.current_thread()][0]
+    sock = conn.sock
+    for _ in range(20):
+        db.records.find({"labels": [BOOK]})
+    db.records.create(BOOK, {"title": "Kept alive"})
+    assert db.engine._connections[threading.current_thread()][0] is conn
+    assert conn.sock is sock
+    db.engine.close()
+    assert (
+        db.records.find({"labels": [BOOK], "where": {"title": "Kept alive"}}).total == 1
+    )
 
 
 def test_bad_token_raises_rushdb_error():

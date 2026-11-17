@@ -16,6 +16,7 @@ from rushdb import (
     RushDB,
     RushDBError,
 )
+from rushdb.direct import DirectEngine
 
 RECORD = {
     "id": "0190a7e2-0000-7000-8000-000000000001",
@@ -158,38 +159,23 @@ def engine_answer(operation):
     return answers.get(key, {"kind": "mutation", "affected": 1})
 
 
-class _Resp:
-    def __init__(self, body):
-        self._body = json.dumps(body).encode("utf-8")
-
-    def read(self):
-        return self._body
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-
 @pytest.fixture
 def engine_calls():
     calls = []
 
-    def fake_urlopen(request, timeout=None):
-        body = json.loads(request.data.decode("utf-8")) if request.data else None
+    def fake_send(engine, data, headers, is_read):
+        body = json.loads(data.decode("utf-8"))
         calls.append(
             {
-                "url": request.full_url,
-                "headers": dict(request.header_items()),
+                "url": f"{engine.base_url}/protocol/v1/execute",
+                "headers": headers,
                 "body": body,
             }
         )
-        return _Resp(
-            {"protocolVersion": 1, "response": engine_answer(body["operation"])}
-        )
+        answer = {"protocolVersion": 1, "response": engine_answer(body["operation"])}
+        return 200, json.dumps(answer).encode("utf-8")
 
-    with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+    with mock.patch.object(DirectEngine, "_send", autospec=True, side_effect=fake_send):
         yield calls
 
 
@@ -413,7 +399,10 @@ def test_imports_and_connections_are_cloud_only_in_direct_mode():
     for name, method in EVERY_METHOD.items():
         if name.startswith(("imports.", "connections.")):
             assert name in CLOUD_ONLY_METHODS, name
-    with mock.patch("urllib.request.urlopen") as urlopen:
+    with (
+        mock.patch("urllib.request.urlopen") as urlopen,
+        mock.patch.object(DirectEngine, "_send") as send,
+    ):
         with pytest.raises(CloudOnlyError) as raised:
             direct_db().imports.import_files([{"data": b"x", "name": "a.csv"}])
         assert raised.value.method == "imports.import_files"
@@ -421,6 +410,7 @@ def test_imports_and_connections_are_cloud_only_in_direct_mode():
             direct_db().connections.sync("conn-1")
         assert raised.value.method == "connections.sync"
     urlopen.assert_not_called()
+    send.assert_not_called()
 
 
 def test_direct_mode_needs_an_engine_url():
@@ -431,7 +421,7 @@ def test_direct_mode_needs_an_engine_url():
 def test_engine_token_and_tenant_scope_are_sent(engine_calls):
     direct_db(scope="tenant-1").records.find({"labels": ["Book"]})
     assert engine_calls[0]["headers"]["Authorization"] == "Bearer ENGINE-SECRET"
-    assert engine_calls[0]["headers"]["X-rushdb-tenant"] == "tenant-1"
+    assert engine_calls[0]["headers"]["X-RushDB-Tenant"] == "tenant-1"
     assert engine_calls[0]["body"]["context"] == {"scope": "tenant-1"}
 
 
