@@ -38,7 +38,12 @@ class TextIndexesAPI(BaseAPI):
         Args:
             params: ``label`` and ``property`` (required); optional ``name``
                 (defaults to a unique ``<label>.<property>.text``) and
-                ``consistency`` (``eventual``, the default, or ``immediate``).
+                ``consistency``: ``eventual`` (the default) applies writes in
+                the background, so a search right after a write may miss it
+                (it reports them in ``pending``); ``immediate`` makes every
+                search apply what is queued first, so it reads your own
+                writes. See ``records.text_search(..., wait_for_pending=...)``
+                for the eventual case.
 
         Returns:
             ApiResponse: ``data`` is the created text index.

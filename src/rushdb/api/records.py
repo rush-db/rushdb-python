@@ -1,3 +1,4 @@
+import time
 import typing
 from typing import Any, Dict, List, Optional, Union
 
@@ -32,11 +33,46 @@ def pick_record_id(target: RecordTarget) -> Optional[str]:
     return None
 
 
-def _is_flat(obj: Any) -> bool:
-    """Return True if obj is a dict with no nested dict/list values."""
-    return isinstance(obj, dict) and not any(
-        isinstance(v, (dict, list)) for v in obj.values()
+RECOMMENDED_IMPORT_BATCH_SIZE = 5_000
+"""Recommended ``batch_size`` for ``create_many``: about where ingest
+throughput stops growing while the server's memory keeps growing with the
+request."""
+
+RECOMMENDED_NESTED_IMPORT_BATCH_SIZE = 10_000
+"""Recommended ``batch_size`` for ``import_json`` (top-level items)."""
+
+
+def _is_point(value: Any) -> bool:
+    """A GeoJSON point, which RushDB 3.0.14 stores as a ``point`` value."""
+    return (
+        isinstance(value, dict)
+        and value.get("type") == "Point"
+        and isinstance(value.get("coordinates"), list)
+        and set(value) <= {"type", "coordinates", "crs"}
     )
+
+
+def _is_flat(obj: Any) -> bool:
+    """Return True if obj is a dict with no nested dict/list values (a GeoJSON
+    point is a value, not a nested object)."""
+    return isinstance(obj, dict) and not any(
+        isinstance(v, (dict, list)) and not _is_point(v) for v in obj.values()
+    )
+
+
+def _batches(items: List[Any], size: Optional[int]) -> List[List[Any]]:
+    if not size or size <= 0 or len(items) <= size:
+        return [items]
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def _import_total(response: Dict[str, Any], records: List[Any]) -> int:
+    if isinstance(response.get("total"), int):
+        return response["total"]
+    data = response.get("data")
+    if isinstance(data, dict) and isinstance(data.get("count"), int):
+        return data["count"]
+    return len(records)
 
 
 def _returned_records(response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -227,6 +263,7 @@ class RecordsAPI(BaseAPI):
         options: Optional[Dict[str, Any]] = None,
         vectors: Optional[List[Optional[List[Dict[str, Any]]]]] = None,
         transaction: Optional[Transaction] = None,
+        batch_size: Optional[int] = None,
     ) -> RecordSearchResult:
         """Create multiple flat records in a single operation.
 
@@ -253,6 +290,16 @@ class RecordsAPI(BaseAPI):
                 "similarityFunction"?: str}]``. Its length must not exceed
                 ``len(data)``. Pass ``None`` in a slot to skip a row.
             transaction: Optional transaction context for the operation.
+            batch_size: Send the rows in requests of this many (5,000 is
+                recommended for large inputs: ingest throughput stops growing
+                there). ``None`` (the default) sends one request, all or
+                nothing. Batched calls are not atomic outside a transaction:
+                each request commits on its own, so if a later one fails the
+                earlier rows stay written. Pass a transaction to keep them
+                atomic. The error a failed batch raises carries ``ingest``:
+                ``{chunks, failed_chunk, completed_chunks, completed_records,
+                in_transaction}``; batches ``0..completed_chunks - 1`` were
+                committed (only staged with ``in_transaction``).
 
         Returns:
             RecordSearchResult: Search-result wrapper containing created records
@@ -287,20 +334,47 @@ class RecordsAPI(BaseAPI):
                 for i, item in enumerate(items)
             ]
 
-        headers = Transaction._build_transaction_header(transaction)
+        return self._import_in_batches(
+            label, _batches(items, batch_size), options, transaction, bool(batch_size)
+        )
 
-        payload = {
-            "label": label,
-            "data": items,
-            "options": options or {"returnResult": True, "suggestTypes": True},
-        }
-        response = self.client._make_request(
-            "POST", "/records/import/json", payload, headers
-        )
-        records = [Record(self.client, r) for r in _returned_records(response)]
-        return RecordSearchResult(
-            data=records, total=response.get("total", len(records)), client=self.client
-        )
+    def _import_in_batches(
+        self,
+        label: Optional[str],
+        batches: List[Any],
+        options: Optional[Dict[str, Any]],
+        transaction: Optional[Transaction],
+        batched: bool,
+    ) -> RecordSearchResult:
+        headers = Transaction._build_transaction_header(transaction)
+        records: List[Record] = []
+        total = 0
+        for index, batch in enumerate(batches):
+            payload = {
+                "label": label,
+                "data": batch,
+                "options": options or {"returnResult": True, "suggestTypes": True},
+            }
+            try:
+                response = self.client._make_request(
+                    "POST", "/records/import/json", payload, headers
+                )
+            except Exception as error:
+                if batched:
+                    # Which batches went in: committed, or only staged when
+                    # the call runs in a transaction.
+                    error.ingest = {  # type: ignore[attr-defined]
+                        "chunks": len(batches),
+                        "failed_chunk": index,
+                        "completed_chunks": index,
+                        "completed_records": total,
+                        "in_transaction": bool(headers),
+                    }
+                raise
+            returned = [Record(self.client, r) for r in _returned_records(response)]
+            records.extend(returned)
+            total += _import_total(response, returned)
+        return RecordSearchResult(data=records, total=total, client=self.client)
 
     def import_json(
         self,
@@ -308,6 +382,7 @@ class RecordsAPI(BaseAPI):
         label: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         transaction: Optional[Transaction] = None,
+        batch_size: Optional[int] = None,
     ) -> RecordSearchResult:
         """Import nested or complex JSON payloads.
 
@@ -327,6 +402,12 @@ class RecordsAPI(BaseAPI):
                 key of ``data``.
             options: Optional import/write options (see server docs).
             transaction: Optional transaction context for the operation.
+            batch_size: When ``data`` is a list, send it in requests of this
+                many top-level items (10,000 is recommended for large inputs).
+                ``None`` (the default) sends one request, all or nothing.
+                Batched calls are not atomic outside a transaction: each
+                request commits on its own. A failed batch's error carries
+                ``ingest``, as in :meth:`create_many`.
 
         Returns:
             RecordSearchResult: Imported records and total count when
@@ -359,19 +440,13 @@ class RecordsAPI(BaseAPI):
                     "label, e.g. { ITEM: [...] }."
                 )
 
-        headers = Transaction._build_transaction_header(transaction)
-        payload = {
-            "label": inferred_label,
-            "data": payload_data,
-            "options": options or {"returnResult": True, "suggestTypes": True},
-        }
-
-        response = self.client._make_request(
-            "POST", "/records/import/json", payload, headers
+        batches = (
+            _batches(payload_data, batch_size)
+            if isinstance(payload_data, list)
+            else [payload_data]
         )
-        records = [Record(self.client, r) for r in _returned_records(response)]
-        return RecordSearchResult(
-            data=records, total=response.get("total", len(records)), client=self.client
+        return self._import_in_batches(
+            inferred_label, batches, options, transaction, bool(batch_size)
         )
 
     def upsert(
@@ -685,13 +760,19 @@ class RecordsAPI(BaseAPI):
         Args:
             search_query: Labels, ``where``, ordering, pagination, ``select`` and
                 ``groupBy`` to search with; omitted, every record matches.
+                ``context: {"check": "warn" | "strict" | "off"}`` sets how the
+                query's labels, properties and compared texts are checked
+                against the data (RushDB 3.0.14; sent only when set).
             record_id: Search only the records directly related to this record.
             transaction: Optional transaction context for the operation.
 
         Returns:
-            RecordSearchResult: The matching records and their total.
+            RecordSearchResult: The matching records and their total; with
+            ``catalog_warnings`` when the query names something no record holds.
 
         Raises:
+            CatalogCheckError: Under ``check: "strict"``, when the query names a
+                label, property or text no record holds (``warnings`` says what).
             RushDBError: When the request fails (authentication, connection, an
                 invalid query). Failures are never reported as an empty result.
         """
@@ -710,7 +791,11 @@ class RecordsAPI(BaseAPI):
         total = response.get("total", 0)
 
         return RecordSearchResult(
-            data=records, total=total, search_query=search_query, client=self.client
+            data=records,
+            total=total,
+            search_query=search_query,
+            client=self.client,
+            catalog_warnings=response.get("warnings"),
         )
 
     def vector_search(
@@ -768,6 +853,7 @@ class RecordsAPI(BaseAPI):
         self,
         params: Dict[str, Any],
         transaction: Optional[Union[Transaction, str]] = None,
+        wait_for_pending: float = 0.0,
     ) -> RecordSearchResult:
         """Keyword (BM25) search over a text index.
 
@@ -790,6 +876,15 @@ class RecordsAPI(BaseAPI):
                 - ``allTerms`` (bool, optional): Every keyword must match.
                 - ``phrase`` (bool, optional): Match the keywords as one phrase.
             transaction: Optional transaction context.
+            wait_for_pending: Seconds to keep repeating the search while the
+                index reports ``pending`` changes, so a search right after a
+                write finds it. ``0`` (the default) searches once.
+
+        An ``eventual`` text index (the default) never makes a write wait, so a
+        search sent right after a write may miss it; the response then reports
+        ``pending`` above 0. To read your own writes, declare the index with
+        ``consistency: "immediate"`` (``db.text_indexes.create``), or pass
+        ``wait_for_pending``.
 
         Returns:
             RecordSearchResult: The page of matches; ``total`` counts every match,
@@ -797,7 +892,19 @@ class RecordsAPI(BaseAPI):
             index had not applied yet).
         """
         headers = Transaction._build_transaction_header(transaction)
-        response = self.client._make_request("POST", "/search/text", params, headers)
+        deadline = time.monotonic() + max(wait_for_pending, 0.0)
+        delay = 0.02
+        while True:
+            response = self.client._make_request(
+                "POST", "/search/text", params, headers
+            )
+            pending = ((response.get("meta") or {}).get("textSearch") or {}).get(
+                "pending"
+            ) or 0
+            if pending <= 0 or time.monotonic() + delay > deadline:
+                break
+            time.sleep(delay)
+            delay = min(delay * 2, 0.25)
         records = [Record(self.client, item) for item in response.get("data", [])]
         return RecordSearchResult(
             data=records,

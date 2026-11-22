@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # A bare ``{"error": "unauthorized"}`` names a code; ``"route not found"`` does not.
 _CODE_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
@@ -66,6 +66,9 @@ class RushDBError(Exception):
             ``None`` for client-side errors such as connection failures.
         code: Optional stable error code (e.g. ``IMPORT_LINK_SPEC_INVALID``) from
             client-side validation or the server response body.
+        ingest: Set when a batch of a batched ``create_many``/``import_json``
+            failed: ``{chunks, failed_chunk, completed_chunks,
+            completed_records, in_transaction}``. ``None`` otherwise.
     """
 
     def __init__(
@@ -79,6 +82,7 @@ class RushDBError(Exception):
         self.details = details or {}
         self.status = status
         self.code = code or (details or {}).get("code")
+        self.ingest: Optional[Dict[str, Any]] = None
 
 
 class NonUniqueResultError(Exception):
@@ -118,3 +122,83 @@ class DirectModeError(RushDBError):
 
     def __init__(self, message: str):
         super().__init__(message, code="DIRECT_MODE_UNSUPPORTED")
+
+
+def error_details(body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The structured ``details`` of an error body: ``error.details`` of the
+    engine's envelope, or a top-level ``details`` (``{}`` when neither)."""
+    body = body or {}
+    error = body.get("error")
+    if isinstance(error, dict) and isinstance(error.get("details"), dict):
+        return error["details"]
+    if isinstance(body.get("details"), dict):
+        return body["details"]
+    return {}
+
+
+class UniqueConstraintError(RushDBError):
+    """A write would give a second record of a label a value a unique index
+    keeps unique (HTTP 409, RushDB 3.0.14). Also raised when a unique index
+    is declared on data that already repeats a value.
+
+    Attributes:
+        label: The label of the unique index.
+        property: The property of the unique index.
+        record_id: The record that holds the value (the value itself is never
+            in the error).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        details: Optional[Dict] = None,
+        status: Optional[int] = 409,
+        code: Optional[str] = None,
+    ):
+        super().__init__(message, details, status=status, code=code or "conflict")
+        inner = error_details(self.details)
+        self.label: Optional[str] = inner.get("label")
+        self.property: Optional[str] = inner.get("property")
+        self.record_id: Optional[str] = inner.get("recordId")
+
+
+class CatalogCheckError(RushDBError):
+    """A query sent with ``context: {"check": "strict"}`` names a label,
+    property or text no record holds, and was refused before it ran
+    (RushDB 3.0.14).
+
+    Attributes:
+        warnings: What the query names that no record holds, with
+            suggestions (the shape of ``SearchResult.warnings``).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        details: Optional[Dict] = None,
+        status: Optional[int] = None,
+        code: Optional[str] = None,
+    ):
+        super().__init__(message, details, status=status, code=code)
+        self.warnings: List[Dict[str, Any]] = list(
+            error_details(self.details).get("warnings") or []
+        )
+
+
+def make_error(
+    message: str,
+    details: Optional[Dict[str, Any]] = None,
+    status: Optional[int] = None,
+    code: Optional[str] = None,
+) -> RushDBError:
+    """The :class:`RushDBError` subclass an error body calls for."""
+    inner = error_details(details)
+    if (
+        (status == 409 or code == "conflict")
+        and "property" in inner
+        and "label" in inner
+    ):
+        return UniqueConstraintError(message, details, status=status, code=code)
+    if isinstance(inner.get("warnings"), list) and inner["warnings"]:
+        return CatalogCheckError(message, details, status=status, code=code)
+    return RushDBError(message, details, status=status, code=code)
