@@ -2,7 +2,7 @@ import io
 from typing import TYPE_CHECKING, Any, Dict, Generic, Iterator, List, Optional, TypeVar
 
 from .record import Record
-from .search_query import SearchQuery
+from .search_query import CatalogWarning, SearchQuery
 
 if TYPE_CHECKING:
     from ..client import RushDB
@@ -35,6 +35,7 @@ class SearchResult(Generic[T]):
         sql: Optional[str] = None,
         name: Optional[str] = None,
         sql_page: Optional[Dict[str, int]] = None,
+        catalog_warnings: Optional[List[CatalogWarning]] = None,
     ):
         """
         Initialize search result.
@@ -51,6 +52,8 @@ class SearchResult(Generic[T]):
             name: For Smart search, a short title of the query
             sql_page: For Smart search, the page (``skip``, ``limit``) of the
                 statement's rows this result holds
+            catalog_warnings: Labels, properties or compared texts of the query
+                that no record holds, with suggestions (RushDB 3.0.14)
         """
         self._data = data
         self._total = total or len(data)
@@ -61,6 +64,9 @@ class SearchResult(Generic[T]):
         self._sql = sql
         self._name = name
         self._sql_page = sql_page or {"skip": 0, "limit": 100}
+        self._catalog_warnings = [
+            warning for warning in catalog_warnings or [] if isinstance(warning, dict)
+        ]
 
     @property
     def data(self) -> List[T]:
@@ -91,6 +97,15 @@ class SearchResult(Generic[T]):
     def warnings(self) -> List[str]:
         """Get warnings returned by AI-assisted query generation."""
         return self._warnings
+
+    @property
+    def catalog_warnings(self) -> List[CatalogWarning]:
+        """What the query names that no record holds: a label, a property of
+        its labels, or a text compared by equality, each with what the query
+        most likely meant (``suggestions``). Empty when nothing is missing, or
+        on a server before RushDB 3.0.14. Send ``context: {"check":
+        "strict"}`` to refuse such a query instead."""
+        return self._catalog_warnings
 
     @property
     def meta(self) -> Dict[str, Any]:
@@ -143,7 +158,8 @@ class SearchResult(Generic[T]):
         Return the result in a standardized dictionary format.
 
         Returns:
-            Dict with keys: total, data, search_query, sql, name, warnings
+            Dict with keys: total, data, search_query, sql, name, warnings,
+            catalog_warnings
         """
         return {
             "total": self.total,
@@ -152,6 +168,7 @@ class SearchResult(Generic[T]):
             "sql": self.sql,
             "name": self.name,
             "warnings": self.warnings,
+            "catalog_warnings": self.catalog_warnings,
         }
 
     def get_page_info(self) -> dict:

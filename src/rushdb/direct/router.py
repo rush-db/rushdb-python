@@ -22,13 +22,39 @@ from .schema import build_schema, build_schema_markdown
 Body = Dict[str, Any]
 
 
-def _ok(data: Any, total: Optional[int] = None, meta: Optional[Body] = None) -> Body:
+def _ok(
+    data: Any,
+    total: Optional[int] = None,
+    meta: Optional[Body] = None,
+    warnings: Optional[List[Body]] = None,
+) -> Body:
     out: Body = {"success": True, "data": data}
     if total is not None:
         out["total"] = total
     if meta is not None:
         out["meta"] = meta
+    if warnings:
+        out["warnings"] = warnings
     return out
+
+
+def _request_context(engine: DirectEngine, search: Optional[Body]) -> Optional[Body]:
+    """The request options a SearchQuery carries in ``context`` (``check``),
+    for the engine's envelope: its query document refuses unknown keys.
+
+    An engine without the catalog check (before 3.0.14) runs every query
+    unchecked: ``warn`` and ``off`` are dropped, ``strict`` is refused."""
+    context = (search or {}).get("context")
+    if not isinstance(context, dict) or context.get("check") is None:
+        return None
+    if not engine.supports("catalogCheck"):
+        if context["check"] == "strict":
+            raise DirectModeError(
+                'context.check "strict" needs an engine with the catalog check '
+                "(RushDB 3.0.14 or newer)."
+            )
+        return None
+    return {"check": context["check"]}
 
 
 def _http_error(status: int, message: str) -> RushDBError:
@@ -183,13 +209,22 @@ def _get_record(engine: DirectEngine, record_id: str) -> Body:
     )
 
 
-def _search_records(engine: DirectEngine, search: Body) -> Tuple[List[Body], int]:
+def _search_records(
+    engine: DirectEngine, search: Body
+) -> Tuple[List[Body], int, List[Body]]:
+    """A records query's rows or records, its total and its catalog-check
+    warnings."""
     result = engine.execute(
-        {"kind": "query", "query": {"kind": "records", "query": query_document(search)}}
+        {
+            "kind": "query",
+            "query": {"kind": "records", "query": query_document(search)},
+        },
+        _request_context(engine, search),
     )
+    warnings = result.get("warnings") or []
     if result.get("kind") == "rows":
-        return result.get("rows") or [], result.get("total", 0)
-    return _sdk_records(result.get("records")), result.get("total", 0)
+        return result.get("rows") or [], result.get("total", 0), warnings
+    return _sdk_records(result.get("records")), result.get("total", 0), warnings
 
 
 def _vector_indexes(engine: DirectEngine) -> List[Body]:
@@ -519,8 +554,8 @@ def _find_records(request: _Request) -> Body:
     )
     if search is None:
         return _ok([], total=0)
-    data, total = _search_records(request.engine, search)
-    return _ok(data, total=total)
+    data, total, warnings = _search_records(request.engine, search)
+    return _ok(data, total=total, warnings=warnings)
 
 
 def _ingest(engine: DirectEngine, tx_id: Optional[str], ingest: Body) -> Body:
@@ -920,7 +955,9 @@ def _property_values(request: _Request) -> Body:
         if body.get("minSimilarity") is not None:
             search["minSimilarity"] = body["minSimilarity"]
         query["search"] = search
-    result = request.engine.execute({"kind": "query", "query": query})
+    result = request.engine.execute(
+        {"kind": "query", "query": query}, _request_context(request.engine, body)
+    )
     data: Body = {"values": result.get("values") or []}
     if result.get("counts"):
         data["counts"] = result["counts"]
@@ -928,7 +965,7 @@ def _property_values(request: _Request) -> Body:
         data["distinctCount"] = result["distinctCount"]
     if result.get("searchMissed"):
         data["searchMissed"] = True
-    return _ok(data)
+    return _ok(data, warnings=result.get("warnings"))
 
 
 def _search_values(request: _Request) -> Body:
@@ -1233,6 +1270,80 @@ def _drop_text_index(request: _Request) -> Body:
     return _ok({"deleted": True})
 
 
+_PROPERTY_INDEX_KINDS = ("ordered", "unique")
+
+
+def _to_property_index(index: Body) -> Body:
+    kind = index.get("kind") or "ordered"
+    return {
+        "name": index.get("name"),
+        "label": index.get("label"),
+        "property": index.get("property"),
+        "kind": kind,
+        "unique": kind == "unique",
+        "status": index.get("state"),
+    }
+
+
+def _property_indexes(request: _Request) -> Body:
+    return _ok(
+        [
+            _to_property_index(index)
+            for index in _declared_indexes(request.engine)
+            if (index.get("kind") or "ordered") in _PROPERTY_INDEX_KINDS
+        ]
+    )
+
+
+def _create_property_index(request: _Request) -> Body:
+    body, engine = request.body, request.engine
+    kind = body.get("kind") or "ordered"
+    if kind not in _PROPERTY_INDEX_KINDS:
+        raise _http_error(400, 'kind is "ordered" or "unique"')
+    if kind == "unique" and not engine.supports("uniqueIndexes"):
+        raise DirectModeError(
+            "Unique indexes need RushDB 3.0.14 or newer; this engine does not "
+            "advertise uniqueIndexes."
+        )
+    taken = _taken_index_names(engine)
+    if body.get("name") is not None and body["name"] in taken:
+        raise _http_error(409, f'An index named "{body["name"]}" already exists')
+    base = _name_with(
+        [
+            _name_part(body.get("label") or ""),
+            _name_part(body.get("property") or ""),
+            kind,
+        ]
+    )
+    result = engine.execute(
+        {
+            "kind": "index",
+            "index": {
+                "kind": "create",
+                "definition": {
+                    "name": body.get("name") or _first_free(base, taken),
+                    "label": body.get("label"),
+                    "property": body.get("property"),
+                    "kind": kind,
+                },
+            },
+        }
+    )
+    return _ok(_to_property_index(result.get("index") or {}))
+
+
+def _drop_property_index(request: _Request) -> Body:
+    name = request.params[0]
+    if not any(
+        index.get("name") == name
+        and (index.get("kind") or "ordered") in _PROPERTY_INDEX_KINDS
+        for index in _declared_indexes(request.engine)
+    ):
+        raise _http_error(404, f'No ordered or unique index named "{name}"')
+    request.engine.execute({"kind": "index", "index": {"kind": "drop", "name": name}})
+    return _ok({"deleted": True})
+
+
 def _text_search(request: _Request) -> Body:
     body, engine = request.body, request.engine
     query = body.get("query")
@@ -1469,6 +1580,9 @@ _ROUTES: List[Tuple[str, "re.Pattern[str]", Callable[[_Request], Body]]] = [
     ),
     ("DELETE", re.compile(rf"^/text-indexes/{_ID}$"), _drop_text_index),
     ("POST", re.compile(r"^/search/text$"), _text_search),
+    ("GET", re.compile(r"^/indexes$"), _property_indexes),
+    ("POST", re.compile(r"^/indexes$"), _create_property_index),
+    ("DELETE", re.compile(rf"^/indexes/{_ID}$"), _drop_property_index),
     ("POST", re.compile(r"^/ai/sql-search$"), _cloud_only("ai.search")),
     ("POST", re.compile(r"^/records/sql-search$"), _cloud_only("ai.run_sql")),
     ("POST", re.compile(r"^/ai/search$"), _vector_search),

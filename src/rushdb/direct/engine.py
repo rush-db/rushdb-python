@@ -18,9 +18,9 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 
-from ..common import RushDBError, parse_error_body
+from ..common import RushDBError, make_error, parse_error_body
 
 DEFAULT_TIMEOUT = 120.0
 """Seconds to wait for the engine to connect or answer."""
@@ -114,11 +114,18 @@ class DirectEngine:
             threading.Thread, Tuple[http.client.HTTPConnection, int]
         ] = {}
         self._lock = threading.Lock()
+        self._capabilities: Optional[Set[str]] = None
 
     # ── transport ───────────────────────────────────────────────────────────
 
-    def execute(self, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """Run one protocol operation and return its ``response``.
+    def execute(
+        self, operation: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Run one protocol operation and return its ``response``, with the
+        envelope's catalog-check ``warnings`` added when there are any.
+
+        ``context`` adds request options to the envelope's ``context``
+        (``{"check": "strict"}``).
 
         Raises:
             RushDBError: When the engine refuses the operation (``status`` is the
@@ -126,8 +133,11 @@ class DirectEngine:
             TimeoutError: When the engine does not answer within ``timeout``.
         """
         envelope: Dict[str, Any] = {"protocolVersion": 1, "operation": operation}
+        envelope_context = dict(context or {})
         if self.scope:
-            envelope["context"] = {"scope": self.scope}
+            envelope_context["scope"] = self.scope
+        if envelope_context:
+            envelope["context"] = envelope_context
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.token}",
@@ -138,7 +148,7 @@ class DirectEngine:
         status, raw = self._send(data, headers, _is_read(operation))
         if status >= 400:
             message, details, code = parse_error_body(raw)
-            raise RushDBError(
+            raise make_error(
                 message or f"engine request failed (HTTP {status})",
                 details,
                 status=status,
@@ -147,8 +157,30 @@ class DirectEngine:
         body = json.loads(raw.decode("utf-8") or "{}")
         if body.get("error"):
             message, details, code = parse_error_body(json.dumps(body))
-            raise RushDBError(message or "engine request failed", details, code=code)
-        return body.get("response", {})
+            raise make_error(message or "engine request failed", details, code=code)
+        response = body.get("response", {})
+        # Catalog-check warnings (RushDB 3.0.14) sit beside the response.
+        if body.get("warnings"):
+            response = {**response, "warnings": body["warnings"]}
+        return response
+
+    def supports(self, flag: str) -> bool:
+        """Whether the engine advertises ``flag`` in ``describe.capabilities``
+        (``uniqueIndexes``, ``catalogCheck``, ``spatialFilters``, … since
+        RushDB 3.0.14). An absent flag means unsupported. Read once per
+        engine."""
+        if self._capabilities is None:
+            answer = self.execute(
+                {"kind": "describe", "describe": {"kind": "capabilities"}}
+            )
+            flags = answer.get("capabilities", answer)
+            if isinstance(flags, dict):
+                self._capabilities = {
+                    str(name) for name, value in flags.items() if value is True
+                }
+            else:
+                self._capabilities = {str(name) for name in flags or []}
+        return flag in self._capabilities
 
     def close(self) -> None:
         """Close the connections this client keeps open, in every thread.

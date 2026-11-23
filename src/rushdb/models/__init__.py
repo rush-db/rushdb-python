@@ -7,7 +7,9 @@ from .catalog import (
     ValueMatchesData,
 )
 from .property import (
+    PointValue,
     Property,
+    PropertyType,
     PropertyValuesData,
     PropertyValuesSearch,
     ValueMatchMode,
@@ -21,16 +23,34 @@ from .relationship import (
 )
 from .result import RecordSearchResult, SearchResult
 from .search_query import (
+    CatalogSuggestion,
+    CatalogWarning,
+    CheckMode,
+    DistanceOrder,
+    QueryContext,
     RelationshipEndpointQuery,
     RelationshipSearchQuery,
     SearchQuery,
     TraversalHops,
     TraversalHopsRange,
     TraversalRelationOptions,
+    WithinBox,
+    WithinRadius,
+    WithinRegion,
 )
 from .transaction import Transaction
 
 __all__ = [
+    "PointValue",
+    "PropertyType",
+    "CatalogSuggestion",
+    "CatalogWarning",
+    "CheckMode",
+    "DistanceOrder",
+    "QueryContext",
+    "WithinBox",
+    "WithinRadius",
+    "WithinRegion",
     "Property",
     "PropertyValuesData",
     "PropertyValuesSearch",

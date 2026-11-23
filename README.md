@@ -225,10 +225,87 @@ relationships = db.relationships.find({
 # Change properties on existing relationships (RushDB 3.0.4+): set writes, unset removes
 db.relationships.update(user, company, type='WORKS_AT', set={'source': 'hr'}, unset=['legacy'])
 # types marks values JSON can't type: 'datetime' stores an ISO string as a datetime
+# ('date', 'localtime', 'localdatetime', 'duration' and 'point' too, on RushDB 3.0.14)
 db.relationships.update(
     user, company, type='WORKS_AT', set={'since': '2024-03-01'}, types={'since': 'datetime'}
 )
 ```
+
+---
+
+## Types, places and unique values (RushDB 3.0.14)
+
+A property holds one of nine types: `boolean`, `number`, `string`, `datetime`,
+`date`, `localtime`, `localdatetime`, `duration` and `point`. With type
+inference on (the default), ISO 8601 strings are stored as their own type:
+
+| You write | Stored as | Reads back as |
+|---|---|---|
+| `"2024-05-01T12:30:00+02:00"` | `datetime` | `"2024-05-01T12:30:00+02:00"`, at its own offset, to the microsecond |
+| `"2024-05-01T10:30:00"` | `localdatetime` | as written |
+| `"2024-05-01"` | `date` | as written |
+| `"10:30:00"` | `localtime` | as written |
+| `"P1DT2H"` | `duration` | as written |
+| `{"type": "Point", "coordinates": [13.405, 52.52]}` | `point` | as written |
+
+Before 3.0.14 a plain date and a zone-less date-time were stored as UTC
+datetimes, a time or duration as a string, and datetimes read back in UTC to
+the millisecond. Pass `options={'suggestTypes': False}` to keep such strings
+as text. `$min`/`$max` and `$timeBucket` answer ISO 8601 text in the
+property's type.
+
+Find points by region, or sort them nearest first:
+
+```python
+from rushdb import distance_from, point, within_box, within_radius
+
+berlin = point(13.405, 52.52)          # longitude first
+db.records.create('CAFE', {'name': 'Kaffeehaus', 'location': berlin})
+
+nearby = db.records.find({
+    'labels': ['CAFE'],
+    'where': {'location': within_radius(berlin, 2000)},     # meters
+    'orderBy': {'location': distance_from(berlin)},          # nearest first
+    'limit': 5,
+})
+in_box = db.records.find({
+    'labels': ['CAFE'],
+    'where': {'location': within_box(point(13.3, 52.45), point(13.5, 52.55))},
+})
+```
+
+A unique index refuses a second record of a label with the same value:
+
+```python
+from rushdb import UniqueConstraintError
+
+db.indexes.create({'label': 'USER', 'property': 'email', 'unique': True})
+try:
+    db.records.create('USER', {'email': 'ada@example.com'})
+except UniqueConstraintError as error:
+    print(error.label, error.property, error.record_id)  # the record holding it
+```
+
+`db.indexes.find()` lists ordered and unique indexes, each with `kind` and
+`unique`; `db.indexes.delete(name)` drops one.
+
+### Catalog check
+
+A query that names a label, a property or a compared text no record holds
+returns `catalog_warnings`, with what it most likely meant:
+
+```python
+result = db.records.find({'labels': ['PERSON'], 'where': {'city': 'berlin'}})
+for warning in result.catalog_warnings:
+    print(warning['kind'], warning.get('suggestions'))   # unknownValue [{'value': 'Berlin', 'reason': 'spelling'}]
+
+# Refuse such a query instead (raises CatalogCheckError, with .warnings), or skip the check:
+db.records.find({'labels': ['PERSON'], 'where': {'city': 'berlin'}, 'context': {'check': 'strict'}})
+db.records.find({'labels': ['PERSON'], 'context': {'check': 'off'}})
+```
+
+`context` is sent only when you set it. `result.warnings` is a different list:
+the assumptions Smart search made.
 
 ---
 
@@ -244,6 +321,23 @@ db.records.import_csv(
     options={'returnResult': True, 'suggestTypes': True, 'skipEmptyValues': True},
     parse_config={'header': True, 'skipEmptyLines': True, 'dynamicTyping': True},
 )
+```
+
+`records.create_many` and `records.import_json` send one request, all or
+nothing. For large inputs, set `batch_size` to split them: 5,000 rows is
+recommended for `create_many` and 10,000 top-level items for `import_json`,
+where ingest throughput stops growing while the server's memory keeps growing
+with the request. A batched call is not atomic outside a transaction: each
+request commits on its own, so a failure leaves the earlier batches written;
+the error then carries `ingest` (`chunks`, `failed_chunk`, `completed_chunks`,
+`completed_records`, `in_transaction`). Pass a transaction to keep it
+all-or-nothing:
+
+```python
+db.records.create_many('ROW', rows, batch_size=5000)
+
+with db.tx.begin() as tx:
+    db.records.create_many('ROW', rows, batch_size=5000, transaction=tx)
 ```
 
 ---
@@ -386,6 +480,7 @@ if result:
 | `has_more`     | `bool`         | Whether more records exist beyond this page |
 | `search_query` | `dict`         | The query that produced this result         |
 | `sql`          | `str`          | For Smart search, the SQL statement it ran  |
+| `catalog_warnings` | `List[dict]` | Labels, properties or texts the query names that no record holds (RushDB 3.0.14) |
 
 ---
 
@@ -440,6 +535,19 @@ results = db.records.text_search({
     'limit': 5,
 })
 print(results.total, results.meta['textSearch'])
+```
+
+A text index is `eventual` by default: writes are applied in the background,
+so a search sent right after a write may miss it, and reports what it has not
+applied yet in `meta['textSearch']['pending']`. To read your own writes,
+declare the index `immediate`, or repeat the search while `pending` is above 0:
+
+```python
+db.text_indexes.create({'label': 'MEMORY', 'property': 'content', 'consistency': 'immediate'})
+
+# or keep it eventual and wait up to 2 seconds for pending changes:
+results = db.records.text_search({'query': 'quarterly results', 'labels': ['MEMORY']},
+                                 wait_for_pending=2)
 ```
 
 Add a `text` leg to a vector search to fuse keyword and vector ranking. `fusion`
@@ -513,7 +621,7 @@ str(user)    # USER: Alice
 ## Transactions
 
 ```python
-with db.transactions.begin() as tx:
+with db.tx.begin() as tx:
     record_a = db.records.create('NODE', {'value': 1}, transaction=tx)
     record_b = db.records.create('NODE', {'value': 2}, transaction=tx)
     record_a.attach(target=record_b, options={'type': 'LINKED'}, transaction=tx)

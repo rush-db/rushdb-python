@@ -4,6 +4,7 @@ with each property's vector indexes attached."""
 
 from typing import Any, Callable, Dict, List, Optional
 
+from ..models.property import ORDERED_PROPERTY_TYPES
 from .engine import DirectEngine
 
 Body = Dict[str, Any]
@@ -58,8 +59,10 @@ def build_schema(
                 if value is not None and str(value) not in samples:
                     samples.append(str(value))
             prop["values"] = samples[:_SAMPLE_VALUES]
+        # A point has no order, so no range; temporal and duration bounds
+        # are kept as the engine's text.
         for bound in ("min", "max"):
-            if definition.get(bound) is not None:
+            if definition.get(bound) is not None and prop["type"] != "point":
                 prop[bound] = (
                     float(definition[bound])
                     if prop["type"] == "number"
@@ -148,9 +151,11 @@ def build_schema_markdown(schema: List[Body]) -> str:
 
     def fmt_values(prop: Body) -> str:
         kind = (prop.get("type") or "").lower()
-        if kind in ("number", "datetime"):
+        if kind in ORDERED_PROPERTY_TYPES:
             if prop.get("min") is not None and prop.get("max") is not None:
                 return f"`{prop['min']}`..`{prop['max']}`"
+            return "—"
+        if kind == "point":
             return "—"
         values = prop.get("values") or []
         if values:

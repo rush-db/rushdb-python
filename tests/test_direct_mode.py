@@ -30,6 +30,13 @@ TEXT_INDEX = {
     "property": "title",
     "state": "ready",
 }
+ORDERED_INDEX = {
+    "kind": "unique",
+    "name": "Book.isbn.unique",
+    "label": "Book",
+    "property": "isbn",
+    "state": "ready",
+}
 VECTOR_INDEX = {
     "name": "book-vec",
     "label": "Book",
@@ -121,7 +128,15 @@ def engine_answer(operation):
                 {"id": "p1", "name": "title", "type": "string", "recordsCount": 1}
             ],
         },
-        "describe.indexes": {"kind": "indexes", "indexes": [TEXT_INDEX]},
+        "describe.indexes": {
+            "kind": "indexes",
+            "indexes": [TEXT_INDEX, ORDERED_INDEX],
+        },
+        "describe.capabilities": {
+            "kind": "capabilities",
+            "capabilities": {"uniqueIndexes": True, "catalogCheck": True},
+        },
+        "index.create": {"kind": "index", "index": ORDERED_INDEX},
         "describe.vectorIndexes": {"kind": "vectorIndexes", "indexes": [VECTOR_INDEX]},
         "describe.vectorIndex": {
             "kind": "vectorIndexStats",
@@ -311,6 +326,11 @@ EVERY_METHOD = {
     "imports.import_files": lambda db: db.imports.import_files(
         [{"data": b"x", "name": "a.csv"}]
     ),
+    "indexes.find": lambda db: db.indexes.find(),
+    "indexes.create": lambda db: db.indexes.create(
+        {"label": "Book", "property": "isbn", "unique": True}
+    ),
+    "indexes.delete": lambda db: db.indexes.delete("Book.isbn.unique"),
     "connections.catalog": lambda db: db.connections.catalog(),
     "connections.push_templates": lambda db: db.connections.push_templates(),
     "connections.list": lambda db: db.connections.list(),
@@ -363,6 +383,7 @@ def sdk_methods(db):
         "relationships",
         "ai",
         "text_indexes",
+        "indexes",
         "settings",
         "imports",
         "connections",

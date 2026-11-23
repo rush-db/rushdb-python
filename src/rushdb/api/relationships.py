@@ -207,8 +207,10 @@ class RelationsAPI(BaseAPI):
             set (dict, optional): Properties to write; ``None`` values store an explicit null.
             unset (list[str], optional): Names of properties to remove.
             types (dict, optional): Type of ``set`` properties JSON can't express, one of
-                ``'string'``, ``'number'``, ``'boolean'``, ``'datetime'``;
-                ``{"since": "datetime"}`` stores an ISO string as a datetime.
+                ``'string'``, ``'number'``, ``'boolean'``, ``'datetime'``, and since
+                RushDB 3.0.14 ``'date'``, ``'localtime'``, ``'localdatetime'``,
+                ``'duration'``, ``'point'``; ``{"since": "date"}`` stores
+                ``"2024-05-01"`` as a date.
 
         Returns:
             dict: API response; ``data["updated"]`` counts the relationships changed.

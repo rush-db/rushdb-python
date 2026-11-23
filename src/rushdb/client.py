@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 from .api.ai import AIAPI
 from .api.connections import ConnectionsAPI
 from .api.imports import ImportsAPI
+from .api.indexes import IndexesAPI
 from .api.labels import LabelsAPI
 from .api.properties import PropertiesAPI
 from .api.query import QueryAPI
@@ -21,7 +22,7 @@ from .api.records import RecordsAPI
 from .api.relationships import RelationsAPI
 from .api.text_indexes import TextIndexesAPI
 from .api.transactions import TransactionsAPI
-from .common import RushDBError, parse_error_body
+from .common import RushDBError, make_error, parse_error_body
 from .direct import DirectEngine
 from .direct import router as direct_router
 from .utils.token_prefix import extract_mixed_properties_from_token
@@ -191,6 +192,7 @@ class RushDB:
         self.relationships = RelationsAPI(self)
         self.ai = AIAPI(self)
         self.text_indexes = TextIndexesAPI(self)
+        self.indexes = IndexesAPI(self)
         self.imports = ImportsAPI(self)
         self.connections = ConnectionsAPI(self)
         self.settings = _SettingsNamespace(self)
@@ -295,7 +297,7 @@ class RushDB:
             except OSError:
                 raw = b""
             message, error_body, code = parse_error_body(raw)
-            raise RushDBError(
+            raise make_error(
                 message or f"HTTP {e.code}", error_body, status=e.code, code=code
             )
         except urllib.error.URLError as e:
